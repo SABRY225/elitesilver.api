@@ -30,6 +30,8 @@ const {  getAllCategories, addCategory, updateCategory, deleteCategory } = requi
 const { createOrder, getAllOrders, updateStatus } = require('../controllers/order.controller');
 const { getDashboardStats, getAdmins, getUsers, addAdmin, updateAdmin, deleteAdmin } = require('../controllers/admin.controller');
 const { addRating, getProductRatings, updateRating, deleteRating, getUserRatings, getReviewsAdmin, deleteRatingByAdmin } = require('../controllers/rating.controller');
+const { City } = require('../models');
+const { updateShippingCity, deleteShippingCity, addShippingCity, getShippingCities } = require('../controllers/city.controller');
 
 // --- مسارات الهوية (Authentication) ---
 router.post('/auth/register', registerAccount); // تسجيل جديد (يرسل OTP)
@@ -81,4 +83,8 @@ router.delete('/admin/categories/:id', adminAuth, deleteCategory);
 router.get('/admin/orders', adminAuth, getAllOrders);
 router.patch('/admin/orders/:id/status', adminAuth, updateStatus);
 
+router.get('/city/shipping-cities', getShippingCities);
+router.post('/city/shipping-cities', addShippingCity);
+router.delete('/city/shipping-cities/:id', deleteShippingCity);
+router.put('/city/shipping-cities/:id', updateShippingCity);
 module.exports = router;
