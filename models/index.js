@@ -17,6 +17,7 @@ db.User = require('./User')(sequelize, DataTypes);
 db.Category = require('./Category')(sequelize, DataTypes);
 db.Product = require('./Product')(sequelize, DataTypes);
 db.Order = require('./Order')(sequelize, DataTypes);
+db.OrderSilver = require('./OrderSilver')(sequelize, DataTypes);
 db.Rating = require('./Rating')(sequelize, DataTypes);
 db.City = require('./City')(sequelize, DataTypes);
 

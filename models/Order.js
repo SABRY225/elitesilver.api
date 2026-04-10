@@ -1,11 +1,15 @@
 // models/Order.js
 module.exports = (sequelize, DataTypes) => {
   const Order = sequelize.define('Order', {
-    customerName: { type: DataTypes.STRING, allowNull: false },
+    fullName: { type: DataTypes.STRING, allowNull: false },
     phone: { type: DataTypes.STRING, allowNull: false },
+    alternatePhone: { type: DataTypes.STRING },
     address: { type: DataTypes.TEXT, allowNull: false },
-    quantity: { type: DataTypes.INTEGER, defaultValue: 1 },
-    totalPrice: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
+    paymentMethod: { type: DataTypes.ENUM('cod', 'online'), allowNull: false },
+    cartItems: { type: DataTypes.JSON, allowNull: false },
+    subtotal: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
+    shipping: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
+    total: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
     notes: { type: DataTypes.TEXT },
     status: {
       type: DataTypes.ENUM('جديد', 'قيد التنفيذ','جاري الشحن', 'مكتمل', 'ملغي'),
@@ -14,9 +18,13 @@ module.exports = (sequelize, DataTypes) => {
   });
 
   Order.associate = (models) => {
-    Order.belongsTo(models.Product, {
-      foreignKey: 'productId',
-      as: 'product'
+    Order.belongsTo(models.User, {
+      foreignKey: 'userId',
+      as: 'user'
+    });
+    Order.belongsTo(models.City, {
+      foreignKey: 'cityId',
+      as: 'cityInfo'
     });
   };
 

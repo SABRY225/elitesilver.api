@@ -27,7 +27,7 @@ const userAuth = require('../middleware/userAuth');
 const { sendOTP, verifyOTP, getMe, registerAccount, login } = require('../controllers/user.controller');
 const { getAll, add, deleteProduct, updateProduct, getProduct, searchProducts } = require('../controllers/product.controller');
 const {  getAllCategories, addCategory, updateCategory, deleteCategory } = require('../controllers/customOrder.controller');
-const { createOrder, getAllOrders, updateStatus } = require('../controllers/order.controller');
+const { createOrder, getAllOrders, updateStatus, getOrdersByUser, createOrderSilver, getOrdersSilverByUser } = require('../controllers/order.controller');
 const { getDashboardStats, getAdmins, getUsers, addAdmin, updateAdmin, deleteAdmin } = require('../controllers/admin.controller');
 const { addRating, getProductRatings, updateRating, deleteRating, getUserRatings, getReviewsAdmin, deleteRatingByAdmin } = require('../controllers/rating.controller');
 const { City } = require('../models');
@@ -38,7 +38,7 @@ router.post('/auth/register', registerAccount); // تسجيل جديد (يرسل
 router.post('/auth/login', login); // تسجيل دخول (يرسل OTP)
 router.post('/auth/login-request', sendOTP); // إرسال الكود
 router.post('/auth/verify-code', verifyOTP); // التحقق والدخول
-router.get('/auth/me', adminAuth, getMe); // بيانات الشخص الحالي
+router.get('/auth/me', adminAuth, getMe); 
 
 // // --- مسارات المتجر (Public) ---
 router.get('/products', getAll); // جلب كل المنتجات
@@ -46,6 +46,9 @@ router.get('/products/search', searchProducts); // البحث في المنتج�
 router.get('/products/:id', getProduct); // جلب كل المنتجات
 router.get('/categories', getAllCategories); // جلب كل التصنيفات
 router.post('/orders/new', createOrder); // إنشاء طلب جديد من عميل
+router.post('/orders/silver', createOrderSilver); // إنشاء طلب جديد من عميل
+router.get('/orders/:userId', getOrdersByUser); // جلب طلبات مستخدم معين
+router.get('/orders-silver/:userId', getOrdersSilverByUser); // جلب طلبات مستخدم معين
 
 // // --- مسارات التقييمات (Public) ---
 router.get('/products/:productId/ratings', getProductRatings); // جلب تقييمات المنتج
