@@ -27,7 +27,7 @@ const userAuth = require('../middleware/userAuth');
 const { sendOTP, verifyOTP, getMe, registerAccount, login } = require('../controllers/user.controller');
 const { getAll, add, deleteProduct, updateProduct, getProduct, searchProducts } = require('../controllers/product.controller');
 const {  getAllCategories, addCategory, updateCategory, deleteCategory } = require('../controllers/customOrder.controller');
-const { createOrder, getAllOrders, updateStatus, getOrdersByUser, createOrderSilver, getOrdersSilverByUser } = require('../controllers/order.controller');
+const { createOrder, getAllOrders, updateStatus, getOrdersByUser, createOrderSilver, getOrdersSilverByUser, getOrdersSilver, updateStatusOrderSilver } = require('../controllers/order.controller');
 const { getDashboardStats, getAdmins, getUsers, addAdmin, updateAdmin, deleteAdmin } = require('../controllers/admin.controller');
 const { addRating, getProductRatings, updateRating, deleteRating, getUserRatings, getReviewsAdmin, deleteRatingByAdmin } = require('../controllers/rating.controller');
 const { City } = require('../models');
@@ -85,6 +85,9 @@ router.delete('/admin/categories/:id', adminAuth, deleteCategory);
 // // إدارة الطلبات
 router.get('/admin/orders', adminAuth, getAllOrders);
 router.patch('/admin/orders/:id/status', adminAuth, updateStatus);
+router.get('/admin/orders/silver', adminAuth, getOrdersSilver);
+router.patch('/admin/orders/silver/:id/status', adminAuth, updateStatusOrderSilver);
+
 
 router.get('/city/shipping-cities', getShippingCities);
 router.post('/city/shipping-cities', addShippingCity);

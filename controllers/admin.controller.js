@@ -1,24 +1,26 @@
 // controllers/adminController.js
 
-const { Order, Product, Category, User, Rating } = require('../models');
+const { Order, Product, Category, User, Rating, OrderSilver } = require('../models');
 
 exports.getDashboardStats = async (req, res) => {
   try {
     const stats = {
       // 1. الإحصائيات الأساسية
-      ordersCount: await Order.count(),
+      ordersCount: await Order.count() + await OrderSilver.count(),
       categoriesCount: await Category.count(),
       productsCount: await Product.count(),
-      totalSales: await Order.sum('totalPrice', { where: { status: "مكتمل" } }) || 0,
+      totalSales: await Order.sum('total', { where: { status: "مكتمل" } }) + await OrderSilver.sum('total_price', { where: { status: "مكتمل" } }),
       reviewsCount:await Rating.count(),
       adminsCount:await User.count({where:{role:'admin'}}),
       clientsCount:await User.count({where:{role:'customer'}}),
 
       // 2. توزيع حالات الطلبات (إضافي)
       orderStatusDistribution: {
-        pending: await Order.count({ where: { status: 'جديد' } }),
-        shipping: await Order.count({ where: { status: 'جاري الشحن' } }),
-        completed: await Order.count({ where: { status: 'مكتمل' } }),
+        new: await Order.count({ where: { status: 'جديد' } })+ await OrderSilver.count({ where: { status: 'جديد' } }),
+        pending: await Order.count({ where: { status: 'قيد التنفيذ' } })+ await OrderSilver.count({ where: { status: 'قيد التنفيذ' } }),
+        shipping: await Order.count({ where: { status: 'جاري الشحن' } }) + await OrderSilver.count({ where: { status: 'جاري الشحن' } }),
+        completed: await Order.count({ where: { status: 'مكتمل' } }) + await OrderSilver.count({ where: { status: 'مكتمل' } }),
+        cancelled: await Order.count({ where: { status: 'ملغي' } }) + await OrderSilver.count({ where: { status: 'ملغي' } }),
       },
     };
 
