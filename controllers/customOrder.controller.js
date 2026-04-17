@@ -186,12 +186,24 @@ exports.updateOrderCustomStatus = async (req, res) => {
 
 // 3. جلب كافة الطلبات (للمسؤول لرؤيتها في لوحة التحكم)
 exports.getAllOrdersCustom = async (req, res) => {
-    try {
-        const orders = await CustomOrder.findAll({
+try {
+        const page = parseInt(req.query.page) || 1; // رقم الصفحة
+        const limit = parseInt(req.query.limit) || 10; // عدد الطلبات في الصفحة
+        const offset = (page - 1) * limit;
+
+        const orders = await CustomOrder.findAndCountAll({
+            limit: limit,
+            offset: offset,
             order: [['createdAt', 'DESC']] // الأحدث أولاً
         });
-        res.status(200).json({ status: 'success', data: orders });
+
+        res.status(200).json({
+            totalItems: orders.count,
+            totalPages: Math.ceil(orders.count / limit),
+            currentPage: page,
+            data: orders.rows
+        });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ message: error.message });
     }
 };

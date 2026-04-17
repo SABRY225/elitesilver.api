@@ -1,12 +1,13 @@
 // controllers/adminController.js
 
-const { Order, Product, Category, User, Rating, OrderSilver } = require('../models');
+const { Order, Product, Category, User, Rating, OrderSilver, CustomOrder } = require('../models');
 
 exports.getDashboardStats = async (req, res) => {
   try {
     const stats = {
       // 1. الإحصائيات الأساسية
       ordersCount: await Order.count() + await OrderSilver.count(),
+      CustomOrdersCount: await CustomOrder.count(),
       categoriesCount: await Category.count(),
       productsCount: await Product.count(),
       totalSales: await Order.sum('total', { where: { status: "مكتمل" } }) + await OrderSilver.sum('total_price', { where: { status: "مكتمل" } }),
