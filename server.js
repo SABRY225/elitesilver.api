@@ -6,9 +6,8 @@ require('dotenv').config();
 
 // 2. تفعيل الـ CORS (يجب أن يكون قبل تعريف المسارات)
 app.use(cors({
-    origin: ['http://localhost:5173','https://elitesilver925.com'], // رابط الفرونت إيند الخاص بك
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-    credentials: true // للسماح بإرسال الكوكيز أو التوكنز إذا احتجت مستقبلاً
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
 }));
 
 app.use(express.json());
@@ -18,7 +17,7 @@ app.use('/api', require('./routes/api'));
 
 const PORT = process.env.PORT || 5000;
 
-db.sequelize.sync({ alter: 0}) 
+db.sequelize.sync({ alter: 2}) 
   .then(() => {
     console.log('✅ MySQL Database Connected & Synced');
     app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

@@ -6,6 +6,11 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       unique: true, // لمنع تكرار نفس الاسم
     },
+    name_en: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      unique: true, 
+    },
     image: {
       type: DataTypes.STRING,
       allowNull: true

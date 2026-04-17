@@ -1,4 +1,4 @@
-const { Category } = require('../models');
+const { Category, CustomOrder } = require('../models');
 const fs = require('fs');
 const path = require('path');
 
@@ -131,4 +131,67 @@ exports.deleteCategory = async (req, res) => {
       message: "خطأ في حذف التصنيف"
     });
   }
+};
+
+
+// 1. إنشاء طلب جديد (للعميل)
+exports.createCustomOrder = async (req, res) => {
+    try {
+        const { customerName, customerPhone, customerAddress, description } = req.body;
+        
+        // التأكد من وجود صورة مرفوعة (باستخدام multer)
+        if (!req.file) {
+            return res.status(400).json({ message: "يرجى رفع صورة للمنتج" });
+        }
+
+        const newOrder = await CustomOrder.create({
+            customerName,
+            customerPhone,
+            customerAddress,
+            description,
+            imagePath: req.file.filename // حفظ اسم الملف المرفوع
+        });
+
+        res.status(201).json({ status: 'success', data: newOrder });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+};
+
+// 2. تعديل حالة الطلب (للمسؤول فقط)
+exports.updateOrderCustomStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body; // 'new', 'reviewing', 'approved', 'completed'
+
+        const order = await CustomOrder.findByPk(id);
+        
+        if (!order) {
+            return res.status(404).json({ message: "الطلب غير موجود" });
+        }
+
+        // تحديث الحالة
+        order.status = status;
+        await order.save();
+
+        res.status(200).json({ 
+            status: 'success', 
+            message: `تم تحديث حالة الطلب إلى: ${status}`,
+            data: order 
+        });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+};
+
+// 3. جلب كافة الطلبات (للمسؤول لرؤيتها في لوحة التحكم)
+exports.getAllOrdersCustom = async (req, res) => {
+    try {
+        const orders = await CustomOrder.findAll({
+            order: [['createdAt', 'DESC']] // الأحدث أولاً
+        });
+        res.status(200).json({ status: 'success', data: orders });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
+    }
 };

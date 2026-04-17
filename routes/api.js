@@ -25,15 +25,18 @@ const uploadMultiple = upload.fields([
 const adminAuth = require('../middleware/adminAuth');
 const userAuth = require('../middleware/userAuth');
 const { sendOTP, verifyOTP, getMe, registerAccount, login } = require('../controllers/user.controller');
-const { getAll, add, deleteProduct, updateProduct, getProduct, searchProducts } = require('../controllers/product.controller');
-const {  getAllCategories, addCategory, updateCategory, deleteCategory } = require('../controllers/customOrder.controller');
-const { createOrder, getAllOrders, updateStatus, getOrdersByUser, createOrderSilver, getOrdersSilverByUser, getOrdersSilver, updateStatusOrderSilver } = require('../controllers/order.controller');
+const { getAll, add, deleteProduct, updateProduct, getProduct, searchProducts, getProductByMobile } = require('../controllers/product.controller');
+const {  getAllCategories, addCategory, updateCategory, deleteCategory, createCustomOrder, getAllOrdersCustom, updateOrderCustomStatus } = require('../controllers/customOrder.controller');
+const { createOrder, getAllOrders, updateStatus, getOrdersByUser, createOrderSilver, getOrdersSilverByUser, getOrdersSilver, updateStatusOrderSilver, getOrdersMobileByUser } = require('../controllers/order.controller');
 const { getDashboardStats, getAdmins, getUsers, addAdmin, updateAdmin, deleteAdmin } = require('../controllers/admin.controller');
 const { addRating, getProductRatings, updateRating, deleteRating, getUserRatings, getReviewsAdmin, deleteRatingByAdmin } = require('../controllers/rating.controller');
 const { City } = require('../models');
 const { updateShippingCity, deleteShippingCity, addShippingCity, getShippingCities } = require('../controllers/city.controller');
+const { getHomeData } = require('../controllers/home.controller');
+const { getAllCommissions, updateCommissions } = require('../controllers/commission.controller');
 
 // --- مسارات الهوية (Authentication) ---
+router.get('/home', getHomeData);
 router.post('/auth/register', registerAccount); // تسجيل جديد (يرسل OTP)
 router.post('/auth/login', login); // تسجيل دخول (يرسل OTP)
 router.post('/auth/login-request', sendOTP); // إرسال الكود
@@ -44,10 +47,12 @@ router.get('/auth/me', adminAuth, getMe);
 router.get('/products', getAll); // جلب كل المنتجات
 router.get('/products/search', searchProducts); // البحث في المنتجات
 router.get('/products/:id', getProduct); // جلب كل المنتجات
+router.get('/products/mobile/:id', getProductByMobile); // جلب المنتج بواسطة ID للجوال
 router.get('/categories', getAllCategories); // جلب كل التصنيفات
 router.post('/orders/new', createOrder); // إنشاء طلب جديد من عميل
 router.post('/orders/silver', createOrderSilver); // إنشاء طلب جديد من عميل
 router.get('/orders/:userId', getOrdersByUser); // جلب طلبات مستخدم معين
+router.get('/orders/mobile/:userId', getOrdersMobileByUser); // جلب طلبات مستخدم معين
 router.get('/orders-silver/:userId', getOrdersSilverByUser); // جلب طلبات مستخدم معين
 
 // // --- مسارات التقييمات (Public) ---
@@ -93,4 +98,17 @@ router.get('/city/shipping-cities', getShippingCities);
 router.post('/city/shipping-cities', addShippingCity);
 router.delete('/city/shipping-cities/:id', deleteShippingCity);
 router.put('/city/shipping-cities/:id', updateShippingCity);
+
+// GET: /api/v1/silver-commissions
+router.get('/silver-commissions', getAllCommissions);
+
+// POST: /api/v1/silver-commissions
+router.post('/silver-commissions', updateCommissions);
+
+
+router.post('/custom/order', upload.single('image'), createCustomOrder);
+
+// مسارات لوحة التحكم (للمسؤول)
+router.get('/custom/orders', getAllOrdersCustom);
+router.patch('/custom/orders/:id/status', updateOrderCustomStatus);
 module.exports = router;

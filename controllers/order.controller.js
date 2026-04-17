@@ -212,9 +212,29 @@ exports.getOrdersByUser = async (req, res) => {
       ],
       order: [["createdAt", "DESC"]],
     });
-    res.json(orders);
+    return res.status(200).json(orders);
   } catch (error) {
-    res
+   return res
+      .status(500)
+      .json({ message: "خطأ في جلب الطلبات", error: error.message });
+  }
+};
+exports.getOrdersMobileByUser = async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const orders = await Order.findAll({
+      where: { userId },
+      include: [
+        {
+          association: "cityInfo",
+          attributes: ["name", "price"],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+    return res.status(200).json({orders});
+  } catch (error) {
+   return res
       .status(500)
       .json({ message: "خطأ في جلب الطلبات", error: error.message });
   }

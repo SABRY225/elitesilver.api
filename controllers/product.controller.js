@@ -102,6 +102,41 @@ exports.getProduct = async (req, res) => {
   }
 };
 
+exports.getProductByMobile = async (req, res) => {
+  try {
+    const { id } = req.params; // الحصول على الـ ID من الرابط
+
+    // البحث عن المنتج في قاعدة البيانات (بفرض استخدام Mongoose)
+    const product = await Product.findByPk(id);
+
+    // التحقق مما إذا كان المنتج موجوداً
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "عذراً، هذا المنتج غير موجود."
+      });
+    }
+
+    // إرجاع بيانات المنتج في حال العثور عليه
+    res.status(200).json({product});
+
+  } catch (error) {
+    console.error("Error in getProduct:", error);
+
+    // التعامل مع خطأ الـ ID غير الصالح (Format Error)
+    if (error.kind === 'ObjectId') {
+      return res.status(400).json({
+        success: false,
+        message: "معرف المنتج غير صالح."
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: "حدث خطأ في السيرفر أثناء جلب بيانات المنتج."
+    });
+  }
+};
 // إضافة منتج جديد (Admin)
 exports.add = async (req, res) => {
   try {

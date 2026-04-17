@@ -20,6 +20,9 @@ db.Order = require('./Order')(sequelize, DataTypes);
 db.OrderSilver = require('./OrderSilver')(sequelize, DataTypes);
 db.Rating = require('./Rating')(sequelize, DataTypes);
 db.City = require('./City')(sequelize, DataTypes);
+db.SubCategory = require('./SubCategory')(sequelize, DataTypes);
+db.Commission = require('./Commission')(sequelize, DataTypes);
+db.CustomOrder = require('./CustomOrder')(sequelize, DataTypes);
 
 // تفعيل العلاقات
 Object.keys(db).forEach(modelName => {

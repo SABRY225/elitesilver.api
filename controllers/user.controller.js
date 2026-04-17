@@ -71,16 +71,18 @@ exports.registerAccount = async (req, res) => {
       `
     };
     await transporter.sendMail(mailOptions);
-    res.json({ message: 'تم إرسال رمز التحقق لبريدك الإلكتروني بنجاح' });
+    return res.status(200).json({ message: 'تم إرسال رمز التحقق لبريدك الإلكتروني بنجاح' });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'حدث خطأ أثناء إنشاء الحساب', message: error.message });
+    return res.status(500).json({ error: 'حدث خطأ أثناء إنشاء الحساب', message: error.message });
   }
 }
 
 exports.login = async (req, res) => {
   try {
     const { email } = req.body;
+    console.log(email);
+    
     const user = await User.findOne({ where: { email } });  
     if (!user) {
       return res.status(400).json({ error: 'البريد الإلكتروني غير موجود' });
@@ -125,10 +127,10 @@ exports.login = async (req, res) => {
       `
     };
     await transporter.sendMail(mailOptions);
-    res.json({ message: 'تم إرسال رمز التحقق لبريدك الإلكتروني بنجاح' });
+    return res.status(200).json({ message: 'تم إرسال رمز التحقق لبريدك الإلكتروني بنجاح' });
   }catch(error){
     console.error(error);    
-    res.status(500).json({ error: 'حدث خطأ أثناء تسجيل الدخول', message: error.message });
+    return res.status(500).json({ error: 'حدث خطأ أثناء تسجيل الدخول', message: error.message });
   }
 }
 
@@ -193,10 +195,10 @@ exports.sendOTP = async (req, res) => {
 
     await transporter.sendMail(mailOptions);
 
-    res.json({ message: 'تم إرسال رمز التحقق لبريدك الإلكتروني بنجاح' });
+    return res.status(200).json({ message: 'تم إرسال رمز التحقق لبريدك الإلكتروني بنجاح' });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'حدث خطأ أثناء إرسال البريد الإلكتروني',message:error.message });
+    return res.status(500).json({ error: 'حدث خطأ أثناء إرسال البريد الإلكتروني',message:error.message });
   }
 };
 
@@ -223,13 +225,13 @@ exports.verifyOTP = async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    res.json({ 
+    return res.status(200).json({ 
       message: 'تم تسجيل الدخول بنجاح',
       token,
       user: { id: user.id, name: user.name, role: user.role }
     });
   } catch (error) {
 
-    res.status(500).json({ error: 'خطأ في عملية التحقق',message:error.message });
+    return res.status(500).json({ error: 'خطأ في عملية التحقق',message:error.message });
   }
 };
