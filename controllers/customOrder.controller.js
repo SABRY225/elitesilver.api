@@ -1,6 +1,7 @@
-const { Category, CustomOrder } = require('../models');
+const { Category, CustomOrder, Product } = require('../models');
 const fs = require('fs');
 const path = require('path');
+const { where } = require('sequelize');
 
 exports.getAllCategories = async (req, res) => {
   try {
@@ -10,6 +11,29 @@ exports.getAllCategories = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "خطأ في جلب التصنيفات"
+    });
+  }
+};
+
+exports.getProductsByCategoryById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // جلب المنتجات مع التأكد من ترتيبها (مثلاً الأحدث أولاً)
+    const products = await Product.findAll({
+      where: { categoryId: id },
+      order: [['createdAt', 'DESC']] 
+    });
+
+    // إرجاع البيانات بشكل منظم
+    return res.status(200).json(products);
+
+  } catch (error) {
+    console.error("Error in getProductsByCategory:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching products for this category",
+      error: error.message
     });
   }
 };
@@ -174,9 +198,68 @@ exports.updateOrderCustomStatus = async (req, res) => {
         order.status = status;
         await order.save();
 
+        if (order.customerEmail) {
+            const statusTranslations = {
+                'reviewing': 'قيد المراجعة',
+                'approved': 'تمت الموافقة عليه',
+                'completed': 'تم الإنجاز',
+                'new': 'جديد'
+            };
+
+            const html = `
+                <h2 style="color: #007bff;">تحديث بخصوص طلبك #${order.id}</h2>
+                <p>عزيزي ${order.customerName}، نود إعلامك بأن حالة طلبك قد تغيرت إلى:</p>
+                <div style="background: #f8f9fa; padding: 15px; border-right: 5px solid #007bff; font-weight: bold;">
+                    ${statusTranslations[status] || status}
+                </div>
+                <p>يمكنك متابعة التفاصيل عبر حسابك في موقعنا.</p>
+            `;
+
+            sendEmailNotification(order.customerEmail, "تحديث حالة الطلب", html)
+                .catch(err => console.error("Email Error:", err));
+        }
+
         res.status(200).json({ 
             status: 'success', 
             message: `تم تحديث حالة الطلب إلى: ${status}`,
+            data: order 
+        });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+};
+exports.updateOrderCustomPrice = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { price } = req.body; // 'new', 'reviewing', 'approved', 'completed'
+
+        const order = await CustomOrder.findByPk(id);
+        
+        if (!order) {
+            return res.status(404).json({ message: "الطلب غير موجود" });
+        }
+
+        // تحديث السعر
+        order.price = price;
+        await order.save();
+
+        if (order.customerEmail) {
+            const html = `
+                <h2 style="color: #28a745;">تحديد سعر طلبك #${order.id}</h2>
+                <p>عزيزي ${order.customerName}، تم مراجعة طلبك وتحديد التكلفة النهائية:</p>
+                <div style="background: #f0fff4; padding: 15px; border-right: 5px solid #28a745; font-size: 18px; font-weight: bold;">
+                    السعر المطلوب: ${price} دينار أردني
+                </div>
+                <p>يرجى الدخول للموقع لتأكيد الطلب وبدء عملية التنفيذ.</p>
+            `;
+
+            sendEmailNotification(order.customerEmail, "تحديد سعر الطلب", html)
+                .catch(err => console.error("Email Error:", err));
+        }
+        
+        res.status(200).json({ 
+            status: 'success', 
+            message: `تم تحديث السعر للطلب إلى: ${price}`,
             data: order 
         });
     } catch (error) {

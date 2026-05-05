@@ -1,27 +1,61 @@
-const express = require('express');
-const cors = require('cors'); // 1. استيراد الحزمة
-const app = express();
-const db = require('./models');
 require('dotenv').config();
 
-// 2. تفعيل الـ CORS (يجب أن يكون قبل تعريف المسارات)
+process.on('unhandledRejection', (err) => {
+  console.error('💥 Unhandled Rejection:', err);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('💥 Uncaught Exception:', err);
+  process.exit(1);
+});
+
+const express = require('express');
+const cors = require('cors');
+
+const app = express();
+const db = require('./models');
+
+// Middlewares
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
 }));
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Static
 app.use('/uploads', express.static('uploads'));
-// ربط المسارات
-app.use('/api', require('./routes/api'));
+
+// Routes
+app.use('/api', require('./routes'));
+
+app.get('/', (req, res) => {
+  res.send('API is running 🚀');
+});
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+  console.error('🔥 Error:', err.stack);
+  res.status(500).json({
+    success: false,
+    message: err.message || 'Internal Server Error'
+  });
+});
 
 const PORT = process.env.PORT || 5000;
 
-db.sequelize.sync({ alter: 0}) 
+// Start
+db.sequelize.authenticate()
   .then(() => {
-    console.log('✅ MySQL Database Connected & Synced');
-    app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+    console.log('✅ Database Connected');
+    return db.sequelize.sync({ alter: false });
+  })
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+    });
   })
   .catch(err => {
-    console.error('❌ Unable to connect to the database:', err);
+    console.error('❌ Startup error:', err);
   });

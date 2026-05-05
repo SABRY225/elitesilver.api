@@ -23,6 +23,9 @@ db.City = require('./City')(sequelize, DataTypes);
 db.SubCategory = require('./SubCategory')(sequelize, DataTypes);
 db.Commission = require('./Commission')(sequelize, DataTypes);
 db.CustomOrder = require('./CustomOrder')(sequelize, DataTypes);
+db.OrderCashierSystem = require('./OrderCashierSystem')(sequelize, DataTypes);
+db.OrderItemCashier = require('./OrderItemCashier')(sequelize, DataTypes);
+
 
 // تفعيل العلاقات
 Object.keys(db).forEach(modelName => {

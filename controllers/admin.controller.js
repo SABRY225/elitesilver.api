@@ -1,27 +1,27 @@
 // controllers/adminController.js
 
-const { Order, Product, Category, User, Rating, OrderSilver, CustomOrder } = require('../models');
+const { Order, Product, Category, User, Rating, OrderSilver, CustomOrder, OrderCashierSystem } = require('../models');
 
 exports.getDashboardStats = async (req, res) => {
   try {
     const stats = {
       // 1. الإحصائيات الأساسية
-      ordersCount: await Order.count() + await OrderSilver.count(),
+      ordersCount: await Order.count() + await OrderSilver.count() + await OrderCashierSystem.count(),
       CustomOrdersCount: await CustomOrder.count(),
       categoriesCount: await Category.count(),
       productsCount: await Product.count(),
-      totalSales: await Order.sum('total', { where: { status: "مكتمل" } }) + await OrderSilver.sum('total_price', { where: { status: "مكتمل" } }),
+      totalSales: await Order.sum('total', { where: { status: "مكتمل" } }) + await OrderSilver.sum('total_price', { where: { status: "مكتمل" } }) + await OrderCashierSystem.sum('totalAmount', { where: { status: "مكتمل" } }),
       reviewsCount:await Rating.count(),
       adminsCount:await User.count({where:{role:'admin'}}),
       clientsCount:await User.count({where:{role:'customer'}}),
 
       // 2. توزيع حالات الطلبات (إضافي)
       orderStatusDistribution: {
-        new: await Order.count({ where: { status: 'جديد' } })+ await OrderSilver.count({ where: { status: 'جديد' } }),
-        pending: await Order.count({ where: { status: 'قيد التنفيذ' } })+ await OrderSilver.count({ where: { status: 'قيد التنفيذ' } }),
-        shipping: await Order.count({ where: { status: 'جاري الشحن' } }) + await OrderSilver.count({ where: { status: 'جاري الشحن' } }),
-        completed: await Order.count({ where: { status: 'مكتمل' } }) + await OrderSilver.count({ where: { status: 'مكتمل' } }),
-        cancelled: await Order.count({ where: { status: 'ملغي' } }) + await OrderSilver.count({ where: { status: 'ملغي' } }),
+        new: await Order.count({ where: { status: 'جديد' } })+ await OrderSilver.count({ where: { status: 'جديد' } }) + await OrderCashierSystem.count({ where: { status: 'new' } }),
+        pending: await Order.count({ where: { status: 'قيد التنفيذ' } })+ await OrderSilver.count({ where: { status: 'قيد التنفيذ' } }) + await OrderCashierSystem.count({ where: { status: 'pending' } }),
+        shipping: await Order.count({ where: { status: 'جاري الشحن' } }) + await OrderSilver.count({ where: { status: 'جاري الشحن' } }) + await OrderCashierSystem.count({ where: { status: 'shipping' } }),
+        completed: await Order.count({ where: { status: 'مكتمل' } }) + await OrderSilver.count({ where: { status: 'مكتمل' } }) + await OrderCashierSystem.count({ where: { status: 'completed' } }),
+        cancelled: await Order.count({ where: { status: 'ملغي' } }) + await OrderSilver.count({ where: { status: 'ملغي' } }) + await OrderCashierSystem.count({ where: { status: 'cancelled' } }),
       },
     };
 
@@ -54,7 +54,7 @@ exports.getAdmins = async(req, res) => {
 
 exports.addAdmin = async(req,res)=>{
   try {
-    const { name, email } = req.body;
+    const { name, email,permissions } = req.body;
 
     // التحقق من البيانات المطلوبة
     if (!name || !email) {
@@ -77,7 +77,8 @@ exports.addAdmin = async(req,res)=>{
     const newAdmin = await User.create({
       name,
       email,
-      role: 'admin'
+      role: 'admin',
+      permissions: permissions || []
     });
 
     res.status(201).json({
@@ -87,7 +88,8 @@ exports.addAdmin = async(req,res)=>{
         id: newAdmin.id,
         name: newAdmin.name,
         email: newAdmin.email,
-        role: newAdmin.role
+        role: newAdmin.role,
+        permissions: newAdmin.permissions
       }
     });
   } catch (error) {
@@ -103,7 +105,7 @@ exports.addAdmin = async(req,res)=>{
 exports.updateAdmin = async(req, res) => {
   try {
     const { id } = req.params;
-    const { name, email } = req.body;
+    const { name, email ,permissions } = req.body;
 
     // جلب المسؤول
     const admin = await User.findByPk(id);
@@ -136,7 +138,8 @@ exports.updateAdmin = async(req, res) => {
     // تحديث البيانات
     await admin.update({
       name: name || admin.name,
-      email: email || admin.email
+      email: email || admin.email,
+      permissions: permissions || admin.permissions
     });
 
     res.json({
@@ -147,6 +150,7 @@ exports.updateAdmin = async(req, res) => {
         name: admin.name,
         email: admin.email,
         role: admin.role,
+        permissions: admin.permissions,
         createdAt: admin.createdAt
       }
     });

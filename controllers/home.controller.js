@@ -6,7 +6,7 @@ const getHomeData = async (req, res) => {
     // 1️⃣ Categories
     const categories = await Category.findAll({
       attributes: [
-        'name',
+        'name','id',
         ['image', 'image_url']
       ]
     });

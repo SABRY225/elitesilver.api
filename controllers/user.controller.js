@@ -1,4 +1,4 @@
-const {Order, CustomOrder, Product } = require("../models");
+const {Order, CustomOrder, Product, OrderCashierSystem, OrderSilver } = require("../models");
 const { User } = require('../models');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
@@ -19,20 +19,20 @@ exports.getStats = async (req, res) => {
 };
 
 exports.getUsers = async (req, res) => {
-  const users = await User.findAll({ attributes: ['id', 'name', 'email', 'role', 'isVerified'] });
+  const users = await User.findAll({ attributes: ['id', 'name', 'email', 'phone', 'address', 'role', 'isVerified'] });
   res.json(users);
 };
 
 
 exports.registerAccount = async (req, res) => {
   try {
-    const { name, email } = req.body;
+    const { name, email,phone,address } = req.body;
     let user = await User.findOne({ where: { email } });
     if (user) {
       return res.status(400).json({ error: 'البريد الإلكتروني مستخدم بالفعل' });
     }
     const otp = Math.floor(1000 + Math.random() * 9000).toString();
-    user = await User.create({ name, email, verificationCode: otp ,role:'customer'});
+    user = await User.create({ name, email, phone, address, verificationCode: otp ,role:'customer'});
     // إعداد مرسل البريد (استخدم بيانات Gmail الخاصة بك أو أي خدمة SMTP)
     const transporter = nodemailer.createTransport({
       host: "smtp.gmail.com", 
@@ -224,14 +224,44 @@ exports.verifyOTP = async (req, res) => {
       process.env.JWT_SECRET, 
       { expiresIn: '7d' }
     );
-
+    const orders = await Order.count({ where: { userId: user.id } });
+    const ordersCashier = await OrderCashierSystem.count({ where: { userId: user.id } });
+    const orderSilver = await OrderSilver.count({ where: { userId: user.id } });
+    const totalOrders = orders + ordersCashier + orderSilver;
     return res.status(200).json({ 
       message: 'تم تسجيل الدخول بنجاح',
       token,
-      user: { id: user.id, name: user.name, role: user.role }
+      user: { id: user.id, name: user.name, role: user.role, permissions: JSON.parse(user.permissions),points:user.points,orderCounter:totalOrders }
     });
   } catch (error) {
 
     return res.status(500).json({ error: 'خطأ في عملية التحقق',message:error.message });
+  }
+};
+
+
+exports.searchCustomer = async (req, res) => {
+  try {
+    const { phone } = req.query;
+   console.log(`+962${phone}`);
+   
+    const customer = await User.findOne({ where: { phone: `+962${phone}` } });
+    
+    if (customer) {
+      return res.status(200).json(customer);
+    }
+    res.status(404).json({ message: "Customer not found" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+
+exports.createCustomer = async (req, res) => {
+  try {
+    const customer = await User.create(req.body);
+    res.status(201).json(customer);
+  } catch (error) {
+    res.status(400).json({ error: error });
   }
 };

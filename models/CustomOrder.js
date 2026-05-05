@@ -6,7 +6,8 @@ id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
   customerAddress: { type: DataTypes.TEXT, allowNull: false },
   description: { type: DataTypes.TEXT, allowNull: false }, 
   imagePath: { type: DataTypes.STRING, allowNull: false }, 
-  status: { type: DataTypes.ENUM('new', 'reviewing', 'approved', 'completed'), defaultValue: 'new' }
+  price: { type: DataTypes.STRING, allowNull: true }, 
+  status: { type: DataTypes.ENUM('new', 'reviewing', 'approved', 'completed','cancelled','shipping'), defaultValue: 'new' }
 })
 
 return CustomOrder
