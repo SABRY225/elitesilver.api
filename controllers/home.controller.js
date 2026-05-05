@@ -33,8 +33,34 @@ const getHomeData = async (req, res) => {
     });
   }
 };
+const getInvestmentData = async (req, res) => {
+  try {
+    const investment = await getInvestment();
+    return res.status(200).json(investment);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: 'Server Error'
+    });
+  }
+};
 
+const OrderAndPointsByUser = async (req, res) => {
+  try {
+    const orders = await Order.findAll({
+      where: { userId: req.params.userId },
+      attributes: ['id', 'total', 'createdAt']
+    });
+    const totalPoints = orders.reduce((sum, order) => sum + order.total, 0);
+    return { orders, totalPoints };
+  } catch (error) {
+    console.error(error);
+    throw new Error('Error while fetching order and points data');
+  }
+};
 
 module.exports = {
-  getHomeData
+  getHomeData,
+  getInvestmentData,
+  OrderAndPointsByUser
 };

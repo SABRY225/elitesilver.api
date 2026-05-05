@@ -12,7 +12,7 @@ module.exports = (sequelize, DataTypes) => {
     total: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
     notes: { type: DataTypes.TEXT },
     status: {
-      type: DataTypes.ENUM('جديد', 'قيد التنفيذ','جاري الشحن', 'مكتمل', 'ملغي'),
+      type: DataTypes.ENUM('جديد', 'قيد التنفيذ','جاري الشحن', 'مكتمل', 'ملغي','مرتجع'),
       defaultValue: 'جديد'
     }
   });

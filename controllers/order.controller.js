@@ -10,148 +10,127 @@ const {
   sequelize,
 } = require("../models");
 const sendEmailNotification = require("../utils/sendEmail");
+const sendEmailNotificationToAdmin = require("../utils/sendEmailToAdmin");
+const { getUsers } = require("./admin.controller");
+const validateCity = require("../helper/validateCity");
+const handlePointsPayment = require("../helper/handlePointsPayment");
+const createOrderRecord = require("../helper/createOrderRecord");
+const updateProductStock = require("../helper/updateProductStock");
+const sendOrderEmails = require("../helper/sendOrderEmails");
+const createSilverOrder = require("../helper/createSilverOrder");
+const sendSilverOrderEmails = require("../helper/sendSilverOrderEmails");
 
-// إنشاء طلب منتج جاهز
 exports.createOrder = async (req, res) => {
   try {
-    const {
-      fullName,
-      city: cityId,
-      address,
-      phone,
-      alternatePhone,
-      paymentMethod,
-      cartItems,
-      subtotal,
-      shipping,
-      total,
-      userId,
-      notes,
-    } = req.body;
+    const data = req.body;
 
-    // التحقق من وجود المستخدم
-    const user = await User.findByPk(userId);
-    if (!user) {
-      const cityData = await City.findByPk(cityId);
-      if (!cityData)
-        return res.status(404).json({ message: "المدينة غير موجودة" });
+    const user = await getUsers(data.userId);
+    const city = await validateCity(data.city);
 
-      const order = await Order.create({
-        fullName,
-        cityId,
-        address,
-        phone,
-        alternatePhone,
-        paymentMethod,
-        cartItems,
-        subtotal,
-        shipping,
-        total,
-        notes,
-      });
-      return res.status(201).json({ message: "تم استقبال طلبك بنجاح", order });
-    } else {
-      // التحقق من وجود المدينة
-      const cityData = await City.findByPk(cityId);
-      if (!cityData)
-        return res.status(404).json({ message: "المدينة غير موجودة" });
-
-      const order = await Order.create({
-        fullName,
-        cityId,
-        address,
-        phone,
-        alternatePhone,
-        paymentMethod,
-        cartItems,
-        subtotal,
-        shipping,
-        total,
-        userId,
-        notes,
-      });
-      const emailToUse = user ? user.email : req.body.email; // استخدم إيميل المستخدم أو الإيميل المدخل في الفورم
-      if (emailToUse) {
-        const html = `<h2>شكراً لطلبك!</h2><p>تم استلام طلبك بقيمة ${total} دينار وجاري معالجته الآن.</p>`;
-        sendEmailNotification(emailToUse, "تأكيد استلام الطلب", html).catch(
-          console.error,
-        );
-      }
-      return res.status(201).json({ message: "تم استقبال طلبك بنجاح", order });
+    if (!city) {
+      return res.status(404).json({ message: "المدينة غير موجودة" });
     }
+
+    await handlePointsPayment(user, data.paymentMethod, data.total);
+
+    const order = await createOrderRecord(data, user);
+
+    await updateProductStock(data.cartItems);
+
+    await sendOrderEmails(user, data);
+
+    return res.status(201).json({
+      message: "تم استقبال طلبك بنجاح",
+      order,
+    });
+
   } catch (error) {
-    res
-      .status(400)
-      .json({ message: "فشل في إنشاء الطلب", error: error.message });
+    res.status(400).json({
+      message: "فشل في إنشاء الطلب",
+      error: error.message,
+    });
   }
 };
+exports.returnOrder = async (req, res) => {
+  const { orderId } = req.params;
 
+  const t = await sequelize.transaction();
+
+  try {
+    // 1. هات الطلب
+    const order = await Order.findByPk(orderId, { transaction: t });
+
+    if (!order) {
+      await t.rollback();
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    // 2. تأكد إن الطلب ينفع يتعمله return
+    if (order.status === "مرتجع") {
+      await t.rollback();
+      return res.status(400).json({ message: "Order already returned" });
+    }
+
+    // 3. المنتجات داخل الطلب
+    const cartItems = JSON.parse(order.cartItems);
+
+    // 4. رجّع الكميات للمخزون
+    for (const item of cartItems) {
+      const product = await Product.findByPk(item.productId, {
+        transaction: t,
+      });
+
+      if (product) {
+        product.quantity += item.quantity;
+        await product.save({ transaction: t });
+      }
+    }
+
+    // 5. تحديث حالة الطلب
+    order.status = "مرتجع";
+    await order.save({ transaction: t });
+
+    // 6. تأكيد العملية
+    await t.commit();
+
+    res.status(200).json({
+      message: "Order returned successfully",
+      order,
+    });
+  } catch (error) {
+    await t.rollback();
+    res.status(500).json({
+      message: "Error while returning order",
+      error: error.message,
+    });
+  }
+};
 exports.createOrderSilver = async (req, res) => {
   try {
-    const {
-      fullName,
-      cityId,
-      address,
-      phone,
-      secondaryPhone,
-      paymentMethod,
-      productName,
-      productPrice,
-      quantity,
-      total_price,
-      userId,
-    } = req.body;
+    const data = req.body;
 
-    const user = await User.findByPk(userId);
-    if (!user) {
-      const cityData = await City.findByPk(cityId);
-      if (!cityData)
-        return res.status(404).json({ message: "المدينة غير موجودة" });
+    const user = await getUser(data.userId);
 
-      const order = await OrderSilver.create({
-        fullName,
-        cityId,
-        address,
-        phone,
-        secondaryPhone,
-        paymentMethod,
-        quantity,
-        total_price,
-        productName,
-        productPrice,
-      });
-      return res.status(201).json({ message: "تم استقبال طلبك بنجاح", order });
-    } else {
-      const cityData = await City.findByPk(cityId);
-      if (!cityData)
-        return res.status(404).json({ message: "المدينة غير موجودة" });
-
-      const order = await OrderSilver.create({
-        fullName,
-        cityId,
-        userId,
-        address,
-        phone,
-        secondaryPhone,
-        paymentMethod,
-        quantity,
-        total_price,
-        productName,
-        productPrice,
-      });
-      const emailToUse = user ? user.email : req.body.email; // استخدم إيميل المستخدم أو الإيميل المدخل في الفورم
-      if (emailToUse) {
-        const html = `<h2>شكراً لطلبك!</h2><p>تم استلام طلبك بقيمة ${(total_price).toFixed(2)} دينار وجاري معالجته الآن.</p>`;
-        sendEmailNotification(emailToUse, "تأكيد استلام الطلب", html).catch(
-          console.error,
-        );
-      }
-      return res.status(201).json({ message: "تم استقبال طلبك بنجاح", order });
+    const city = await validateCity(data.cityId);
+    if (!city) {
+      return res.status(404).json({ message: "المدينة غير موجودة" });
     }
+
+    await handlePointsPayment(user, data.paymentMethod, data.total_price);
+
+    const order = await createSilverOrder(data, user);
+
+    await sendSilverOrderEmails(user, data);
+
+    return res.status(201).json({
+      message: "تم استقبال طلبك بنجاح",
+      order,
+    });
+
   } catch (error) {
-    res
-      .status(400)
-      .json({ message: "فشل في إنشاء الطلب", error: error.message });
+    res.status(400).json({
+      message: error.message || "فشل في إنشاء الطلب",
+    });
   }
 };
 exports.getOrdersSilver = async (req, res) => {
@@ -247,6 +226,7 @@ exports.getOrdersMobileByUser = async (req, res) => {
   try {
     const orders = await Order.findAll({
       where: { userId },
+      attributes: ["cartItems", "total", "status", "createdAt"],
       include: [
         {
           association: "cityInfo",
@@ -255,7 +235,55 @@ exports.getOrdersMobileByUser = async (req, res) => {
       ],
       order: [["createdAt", "DESC"]],
     });
-    return res.status(200).json({ orders });
+
+    const ordersSilver = await OrderSilver.findAll({
+      where: { userId },
+      attributes: [
+        "productName",
+        "productPrice",
+        "quantity",
+        "total_price",
+        "status",
+        "createdAt",
+      ],
+      include: [
+        {
+          association: "cityInfo",
+          attributes: ["name", "price"],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+    const normalizedOrders = orders.map((order) => ({
+      type: "normal",
+      items: JSON.parse(order.cartItems).map((item) => ({
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+      })),
+      total: order.total,
+      status: order.status,
+      city: order.cityInfo,
+      createdAt: order.createdAt,
+    }));
+    const normalizedSilver = ordersSilver.map((order) => ({
+      type: "silver",
+      items: [
+        {
+          name: order.productName,
+          price: order.productPrice,
+          quantity: order.quantity,
+        },
+      ],
+      total: order.total_price,
+      status: order.status,
+      city: order.cityInfo,
+      createdAt: order.createdAt,
+    }));
+    const allOrders = [...normalizedOrders, ...normalizedSilver].sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+    );
+    return res.status(200).json({ orders: allOrders });
   } catch (error) {
     return res
       .status(500)
@@ -263,7 +291,6 @@ exports.getOrdersMobileByUser = async (req, res) => {
   }
 };
 
-// جلب كل الطلبات للمدير
 exports.getAllOrders = async (req, res) => {
   try {
     const orders = await Order.findAll({
@@ -356,9 +383,17 @@ exports.updateStatus = async (req, res) => {
     await order.save();
     if (order.User && order.User.email) {
       const html = `<h2>تحديث حالة الطلب #${order.id}</h2><p>عزيزي العميل، تم تغيير حالة طلبك إلى: <b>${status}</b></p>`;
-      sendEmailNotification(order.User.email, "تحديث حالة الطلب", html).catch(
-        console.error,
-      );
+      await sendEmailNotification(
+        order.User.email,
+        "تحديث حالة الطلب",
+        html,
+      ).catch(console.error);
+    }
+    // if order status is "تم التسليم" increment user points by total
+    if (status === "مكتمل" && order.User) {
+      const pointsToAdd = Math.floor(order.total);
+      const user = await User.findByPk(order.userId);
+      await user.increment("points", { by: pointsToAdd });
     }
     return res.json({ message: "تم تحديث حالة الطلب", order });
   } catch (error) {
@@ -376,11 +411,16 @@ exports.updateStatusOrderSilver = async (req, res) => {
     await order.save();
     if (order.User && order.User.email) {
       const html = `<h2>تحديث حالة طلب الفضة #${order.id}</h2><p>تم تغيير الحالة إلى: <b>${status}</b></p>`;
-      sendEmailNotification(
+      await sendEmailNotification(
         order.User.email,
         "تحديث حالة طلب الفضة",
         html,
       ).catch(console.error);
+    }
+    if (status === "مكتمل" && order.User) {
+      const pointsToAdd = Math.floor(order.total_price);
+      const user = await User.findByPk(order.userId);
+      await user.increment("points", { by: pointsToAdd });
     }
     res.json({ message: "تم تحديث حالة الطلب", order });
   } catch (error) {
@@ -392,7 +432,8 @@ exports.createOrderCashierSystem = async (req, res) => {
   const t = await sequelize.transaction();
 
   try {
-    const { customerId, items, totalAmount, paymentMethod, orderType } = req.body;
+    const { customerId, items, totalAmount, paymentMethod, orderType } =
+      req.body;
 
     const customer = await User.findByPk(customerId, { transaction: t });
     if (!customer) {
@@ -417,7 +458,11 @@ exports.createOrderCashierSystem = async (req, res) => {
 
       if (customer.email) {
         const html = `<h3>تم استخدام نقاطك للدفع</h3><p>تم خصم ${pointsToDeduct} نقطة مقابل مشتريات بقيمة ${totalAmount} دينار.</p>`;
-        sendEmailNotification(customer.email, "إيصال دفع بالنقاط", html).catch(console.error);
+        await sendEmailNotification(
+          customer.email,
+          "إيصال دفع بالنقاط",
+          html,
+        ).catch(console.error);
       }
     } else {
       await customer.increment("points", {
@@ -433,7 +478,7 @@ exports.createOrderCashierSystem = async (req, res) => {
         paymentMethod,
         orderType,
       },
-      { transaction: t }
+      { transaction: t },
     );
 
     const orderItems = items.map((item) => ({

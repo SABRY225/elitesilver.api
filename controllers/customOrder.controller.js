@@ -2,6 +2,7 @@ const { Category, CustomOrder, Product } = require('../models');
 const fs = require('fs');
 const path = require('path');
 const { where } = require('sequelize');
+const sendEmailNotificationToAdmin = require('../utils/sendEmailToAdmin');
 
 exports.getAllCategories = async (req, res) => {
   try {
@@ -175,7 +176,16 @@ exports.createCustomOrder = async (req, res) => {
             description,
             imagePath: req.file.filename // حفظ اسم الملف المرفوع
         });
-
+         // إرسال إشعار عبر البريد الإلكتروني للمسؤول
+         const htmlContent = `
+            <h2 style="color: #007bff;">طلب جديد من ${customerName}</h2>
+            <p>تم استلام طلب جديد من العميل ${customerName}.</p>
+            <p><strong>رقم الهاتف:</strong> ${customerPhone}</p>
+            <p><strong>العنوان:</strong> ${customerAddress}</p>
+            <p><strong>الوصف:</strong> ${description}</p>
+            <p>يرجى مراجعة الطلب في لوحة التحكم لاتخاذ الإجراءات اللازمة.</p>
+        `;
+        await sendEmailNotificationToAdmin(htmlContent, "طلب جديد من العميل", htmlContent);
         res.status(201).json({ status: 'success', data: newOrder });
     } catch (error) {
         res.status(500).json({ status: 'error', message: error.message });
@@ -215,7 +225,7 @@ exports.updateOrderCustomStatus = async (req, res) => {
                 <p>يمكنك متابعة التفاصيل عبر حسابك في موقعنا.</p>
             `;
 
-            sendEmailNotification(order.customerEmail, "تحديث حالة الطلب", html)
+            await sendEmailNotification(order.customerEmail, "تحديث حالة الطلب", html)
                 .catch(err => console.error("Email Error:", err));
         }
 
@@ -253,7 +263,7 @@ exports.updateOrderCustomPrice = async (req, res) => {
                 <p>يرجى الدخول للموقع لتأكيد الطلب وبدء عملية التنفيذ.</p>
             `;
 
-            sendEmailNotification(order.customerEmail, "تحديد سعر الطلب", html)
+           await sendEmailNotification(order.customerEmail, "تحديد سعر الطلب", html)
                 .catch(err => console.error("Email Error:", err));
         }
         

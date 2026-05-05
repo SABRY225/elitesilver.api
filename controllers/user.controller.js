@@ -35,9 +35,9 @@ exports.registerAccount = async (req, res) => {
     user = await User.create({ name, email, phone, address, verificationCode: otp ,role:'customer'});
     // إعداد مرسل البريد (استخدم بيانات Gmail الخاصة بك أو أي خدمة SMTP)
     const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com", 
+      host: "elitesilver925.com",
       port: 465,
-      secure: true,
+      secure: true, 
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
@@ -92,7 +92,7 @@ exports.login = async (req, res) => {
     await user.save();
     // إعداد مرسل البريد (استخدم بيانات Gmail الخاصة بك أو أي خدمة SMTP)
     const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com", 
+      host: "elitesilver925.com",
       port: 465,
       secure: true,
       auth: {
@@ -153,9 +153,9 @@ exports.sendOTP = async (req, res) => {
 
     // إعداد مرسل البريد (استخدم بيانات Gmail الخاصة بك أو أي خدمة SMTP)
  const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com", 
-  port: 465,
-  secure: true,
+      host: "elitesilver925.com",
+      port: 465,
+      secure: true,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
