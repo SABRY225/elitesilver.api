@@ -12,7 +12,8 @@ const {
   updateProduct,
   getProduct,
   searchProducts,
-  getProductByMobile
+  getProductByMobile,
+  searchProductsBySuk
 } = require('../controllers/product.controller');
 
 // multer setup
@@ -26,6 +27,7 @@ const uploadMultiple = upload.fields([
 // Public
 router.get('/', getAll);
 router.get('/search', searchProducts);
+router.get('/search-suk', searchProductsBySuk);
 router.get('/:id', getProduct);
 router.get('/mobile/:id', getProductByMobile);
 

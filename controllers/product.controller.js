@@ -3,11 +3,12 @@
 const { Product } = require('../models');
 const fs = require('fs');
 const path = require('path');
+const { Op } = require('sequelize');
 // جلب كل المنتجات مع إمكانية الفلترة حسب التصنيف
 exports.getAll = async (req, res) => {
   try {
     const { categoryId } = req.query;
-    const filter = categoryId ? { where: { categoryId } } : {};
+    const filter = categoryId ? { where: { categoryId ,stock: { [Op.gt]: 0 } } } : {where:{stock: { [Op.gt]: 0 }} };
     const products = await Product.findAll({ ...filter, include: 'category' });
     res.json(products);
   } catch (error) {
@@ -29,6 +30,8 @@ exports.searchProducts = async (req, res) => {
           { name: { [require('sequelize').Op.like]: `%${q}%` } },
           { description: { [require('sequelize').Op.like]: `%${q}%` } }
         ]
+        ,
+        stock: { [require('sequelize').Op.gt]: 0 }
       };
     }
     
@@ -65,6 +68,22 @@ exports.searchProducts = async (req, res) => {
   }
 };
 
+exports.searchProductsBySuk = async (req, res) => {
+  try {
+    const { suk } = req.query;
+    if (!suk) {
+      return res.status(400).json({ message: "يرجى تقديم رقم SKU للبحث" });
+    }
+    const products = await Product.findOne({
+      where: { sku: suk },
+      attributes: ['id', 'name', 'price', 'image', 'sku','stock']
+    });
+    res.status(200).json(products);
+  } catch (error) {
+    console.error('Search by SKU error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
 // جلب منتج واحد بواسطة الـ ID
 exports.getProduct = async (req, res) => {
   try {
@@ -143,7 +162,7 @@ exports.add = async (req, res) => {
     // 1. استخراج البيانات من body
     const { 
       name, price, pricePerGram, categoryId, description, 
-      weight, silverType, stoneType, stoneColor, size, stock, sku 
+      weight, silverType, stoneType, stoneColor, size, stock, sku ,branch
     } = req.body;
     
     // 2. التحقق من وجود صورة رئيسية
@@ -182,6 +201,7 @@ exports.add = async (req, res) => {
       stoneColor,
       size,
       stock,
+      branch,
       sku,
       image: imageUrl,
       galleryImages

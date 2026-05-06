@@ -13,7 +13,6 @@ const createOrderRecord = async (data, user) => {
     shipping: data.shipping,
     total: data.total,
     userId: user ? user.id : null,
-    notes: data.notes,
   });
 };
 module.exports = createOrderRecord;

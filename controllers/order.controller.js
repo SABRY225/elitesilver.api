@@ -11,7 +11,6 @@ const {
 } = require("../models");
 const sendEmailNotification = require("../utils/sendEmail");
 const sendEmailNotificationToAdmin = require("../utils/sendEmailToAdmin");
-const { getUsers } = require("./admin.controller");
 const validateCity = require("../helper/validateCity");
 const handlePointsPayment = require("../helper/handlePointsPayment");
 const createOrderRecord = require("../helper/createOrderRecord");
@@ -19,25 +18,33 @@ const updateProductStock = require("../helper/updateProductStock");
 const sendOrderEmails = require("../helper/sendOrderEmails");
 const createSilverOrder = require("../helper/createSilverOrder");
 const sendSilverOrderEmails = require("../helper/sendSilverOrderEmails");
+const getUserFun = require("../helper/getUser");
 
 exports.createOrder = async (req, res) => {
   try {
     const data = req.body;
+    console.log("true 0");
 
-    const user = await getUsers(data.userId);
+    const user = await getUserFun(data.userId);
     const city = await validateCity(data.city);
-
+    console.log(user);
+    console.log(city);
+    console.log("true 1");
+    
     if (!city) {
       return res.status(404).json({ message: "المدينة غير موجودة" });
     }
-
+    
     await handlePointsPayment(user, data.paymentMethod, data.total);
-
+    console.log("true 2");
+    
     const order = await createOrderRecord(data, user);
-
+    console.log("true 3");
     await updateProductStock(data.cartItems);
+    console.log("true 4");
 
     await sendOrderEmails(user, data);
+    console.log("true 5");
 
     return res.status(201).json({
       message: "تم استقبال طلبك بنجاح",
@@ -81,7 +88,7 @@ exports.returnOrder = async (req, res) => {
       });
 
       if (product) {
-        product.quantity += item.quantity;
+        product.stock += item.quantity;
         await product.save({ transaction: t });
       }
     }
@@ -109,7 +116,7 @@ exports.createOrderSilver = async (req, res) => {
   try {
     const data = req.body;
 
-    const user = await getUser(data.userId);
+    const user = await getUserFun(data.userId);
 
     const city = await validateCity(data.cityId);
     if (!city) {
@@ -464,7 +471,7 @@ exports.createOrderCashierSystem = async (req, res) => {
           html,
         ).catch(console.error);
       }
-    } else {
+    } else if (orderType =="buy") {
       await customer.increment("points", {
         by: Math.floor(Number(totalAmount)),
         transaction: t,
@@ -480,6 +487,24 @@ exports.createOrderCashierSystem = async (req, res) => {
       },
       { transaction: t },
     );
+   // loop items in product increment quantity by item.quantity
+    if (orderType =="buy") {
+      for (const item of items) {
+      const product = await Product.findByPk(item.id, {
+        transaction: t,
+      });
+      if (product) {
+        if (product.stock < item.quantity) {
+          await t.rollback();
+          return res.status(400).json({
+            message: `المنتج ${product.name} لا يوجد منه كمية كافية في المخزون`,
+          });
+        }
+        product.stock -= item.quantity;
+        await product.save({ transaction: t });
+      }
+    }
+    }
 
     const orderItems = items.map((item) => ({
       productName: item.productName,

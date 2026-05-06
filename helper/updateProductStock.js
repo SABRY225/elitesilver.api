@@ -5,7 +5,7 @@ const updateProductStock = async (cartItems) => {
     const product = await Product.findByPk(item.productId);
 
     if (product) {
-      product.quantity -= item.quantity;
+      product.stock -= item.quantity;
       await product.save();
     }
   }

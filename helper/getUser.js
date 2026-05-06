@@ -1,8 +1,8 @@
 const { User } = require("../models");
 
-const getUser = async (userId) => {
+const getUserFun = async (userId) => {
   if (!userId) return null;
   return await User.findByPk(userId);
 };
 
-module.exports = getUser;
+module.exports = getUserFun;

@@ -231,7 +231,7 @@ exports.verifyOTP = async (req, res) => {
     return res.status(200).json({ 
       message: 'تم تسجيل الدخول بنجاح',
       token,
-      user: { id: user.id, name: user.name, role: user.role, permissions: JSON.parse(user.permissions),points:user.points,orderCounter:totalOrders }
+      user: { id: user.id, name: user.name,phone:user.phone,address:user.address, role: user.role, permissions: JSON.parse(user.permissions),points:user.points,orderCounter:totalOrders }
     });
   } catch (error) {
 

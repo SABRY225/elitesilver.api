@@ -5,6 +5,11 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: false
     },
+    branch: {
+      type: DataTypes.ENUM('اربد', 'خلدا','ابو نصير'),
+      defaultValue: 'اربد',
+      allowNull:true
+    },
     price: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false

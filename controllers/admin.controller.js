@@ -1,5 +1,6 @@
 // controllers/adminController.js
 
+const e = require('express');
 const { Order, Product, Category, User, Rating, OrderSilver, CustomOrder, OrderCashierSystem } = require('../models');
 
 exports.getDashboardStats = async (req, res) => {
@@ -38,6 +39,17 @@ exports.getDashboardStats = async (req, res) => {
     });
   }
 };
+exports.getAllProducts = async (req, res) => {
+  try {
+    const { categoryId } = req.query;
+    const filter = categoryId ? { where: { categoryId  } } : {};
+    const products = await Product.findAll({ ...filter, include: 'category' });
+    res.json(products);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 
 exports.getAdmins = async(req, res) => {
   try {
@@ -52,9 +64,42 @@ exports.getAdmins = async(req, res) => {
   }
 }
 
+exports.getAdmin = async(req, res) => {
+  try {
+    const { id } = req.params;
+    const admin = await User.findByPk(id);
+
+    if (!admin || admin.role !== 'admin') {
+      return res.status(404).json({
+        success: false,
+        message: "المسؤول غير موجود"
+      });
+    }
+    res.json({
+      success: true,
+      data: {
+        id: admin.id,
+        name: admin.name,
+        email: admin.email,
+        role: admin.role,
+        phone: admin.phone,
+        permissions: JSON.parse(admin.permissions),
+        createdAt: admin.createdAt
+      }
+    });
+  } catch (error) {
+    console.error("Get Admin Error:", error);
+    res.status(500).json({  
+      success: false,
+      message: "خطأ في جلب بيانات المسؤول",
+      error: error.message
+    });
+  }
+};
+
 exports.addAdmin = async(req,res)=>{
   try {
-    const { name, email,permissions } = req.body;
+    const { name, email,permissions,phone } = req.body;
 
     // التحقق من البيانات المطلوبة
     if (!name || !email) {
@@ -78,6 +123,7 @@ exports.addAdmin = async(req,res)=>{
       name,
       email,
       role: 'admin',
+      phone: phone || null,
       permissions: permissions || []
     });
 

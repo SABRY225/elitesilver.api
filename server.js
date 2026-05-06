@@ -14,7 +14,7 @@ const cors = require('cors');
 
 const app = express();
 const db = require('./models');
-
+require('./services/stockNotifier');
 // Middlewares
 app.use(cors({
   origin: '*',
@@ -49,7 +49,7 @@ const PORT = process.env.PORT || 5000;
 db.sequelize.authenticate()
   .then(() => {
     console.log('✅ Database Connected');
-    return db.sequelize.sync({ alter: false });
+    return db.sequelize.sync({ alter: 0 });
   })
   .then(() => {
     app.listen(PORT, () => {
