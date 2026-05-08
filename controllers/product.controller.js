@@ -124,7 +124,8 @@ exports.getProduct = async (req, res) => {
 exports.getProductByMobile = async (req, res) => {
   try {
     const { id } = req.params; // الحصول على الـ ID من الرابط
-
+   console.log("id mobile: ", id);
+   
     // البحث عن المنتج في قاعدة البيانات (بفرض استخدام Mongoose)
     const product = await Product.findByPk(id);
 

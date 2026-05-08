@@ -13,6 +13,8 @@ db.Sequelize = Sequelize;
 db.sequelize = sequelize;
 
 // استيراد النماذج
+db.Cart = require('./Cart')(sequelize, DataTypes);
+db.Favorite = require('./Favorite')(sequelize, DataTypes);
 db.User = require('./User')(sequelize, DataTypes);
 db.Category = require('./Category')(sequelize, DataTypes);
 db.Product = require('./Product')(sequelize, DataTypes);

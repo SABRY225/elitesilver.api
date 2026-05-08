@@ -1,4 +1,4 @@
-const { Product, Category } = require('../models');
+const { Product, Category, OrderSilver, User, Order } = require('../models');
 const { getInvestment } = require('../utils/getInvestment');
 
 const getHomeData = async (req, res) => {
@@ -47,15 +47,36 @@ const getInvestmentData = async (req, res) => {
 
 const OrderAndPointsByUser = async (req, res) => {
   try {
-    const orders = await Order.findAll({
-      where: { userId: req.params.userId },
-      attributes: ['id', 'total', 'createdAt']
+    const { userId } = req.params;
+
+    // 1. جلب عدد الطلبات من جدول الطلبات العادية
+    const ordersCount = await Order.count({
+      where: { userId: userId },
     });
-    const totalPoints = orders.reduce((sum, order) => sum + order.total, 0);
-    return { orders, totalPoints };
+
+    // 2. جلب عدد الطلبات من جدول الفضة (أو الطلبات الأخرى)
+    const ordersSilverCount = await OrderSilver.count({
+      where: { userId: userId },
+    });
+
+    // 3. لحساب النقاط، نحتاج لجلب قيم الطلبات نفسها وليس العدد فقط
+    // سنفترض أن النقاط تُحسب من جدول الطلبات الرئيسي (Order)
+    const orders = await Order.count({
+      where: { userId: userId },
+    });
+
+    // حساب مجموع النقاط بناءً على حقل total في الطلبات
+    const user = await User.findOne({where: { id: userId }})
+
+    // إرجاع النتيجة النهائية
+    return res.status(200).json({ 
+      order_count: ordersCount + ordersSilverCount, 
+      user_points: user.points 
+    });
+
   } catch (error) {
-    console.error(error);
-    throw new Error('Error while fetching order and points data');
+    console.error("Error in OrderAndPointsByUser:", error);
+    return res.status(500).json({ message: 'حدث خطأ أثناء جلب البيانات' });
   }
 };
 

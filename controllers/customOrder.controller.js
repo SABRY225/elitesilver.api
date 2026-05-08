@@ -178,13 +178,23 @@ exports.createCustomOrder = async (req, res) => {
         });
          // إرسال إشعار عبر البريد الإلكتروني للمسؤول
          const htmlContent = `
-            <h2 style="color: #007bff;">طلب جديد من ${customerName}</h2>
-            <p>تم استلام طلب جديد من العميل ${customerName}.</p>
-            <p><strong>رقم الهاتف:</strong> ${customerPhone}</p>
-            <p><strong>العنوان:</strong> ${customerAddress}</p>
-            <p><strong>الوصف:</strong> ${description}</p>
-            <p>يرجى مراجعة الطلب في لوحة التحكم لاتخاذ الإجراءات اللازمة.</p>
-        `;
+    <div style="direction: rtl; font-family: 'Tahoma', sans-serif; border: 1px solid #BDC3C7; padding: 20px; border-radius: 10px; background-color: #f9f9f9;">
+        <div style="background-color: #1A1A1B; padding: 15px; border-radius: 8px 8px 0 0; text-align: center;">
+            <h2 style="color: #BDC3C7; margin: 0;">طلب تصميم فضة جديد</h2>
+        </div>
+        <div style="padding: 20px; color: #2C3E50;">
+            <p style="font-size: 16px;">وصلك طلب مخصص جديد من العميل: <strong>${customerName}</strong></p>
+            <hr style="border: 0; border-top: 1px solid #BDC3C7;">
+            <p><strong>📞 رقم الهاتف:</strong> ${customerPhone}</p>
+            <p><strong>📍 العنوان:</strong> ${customerAddress}</p>
+            <p><strong>📝 وصف الطلب:</strong></p>
+            <div style="background-color: #ffffff; padding: 10px; border-right: 4px solid #1A1A1B; margin-bottom: 15px;">
+                ${description}
+            </div>
+            <p style="font-size: 12px; color: #7f8c8d;">* يمكنك مراجعة الصورة المرفقة والرد على العميل عبر لوحة التحكم.</p>
+        </div>
+    </div>
+`;
         await sendEmailNotificationToAdmin(htmlContent, "طلب جديد من العميل", htmlContent);
         res.status(201).json({ status: 'success', data: newOrder });
     } catch (error) {
