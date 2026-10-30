@@ -13,4 +13,7 @@ router.use('/city', require('./city.routes'));
 router.use('/commissions', require('./commission.routes'));
 router.use('/custom', require('./customOrder.routes'));
 router.use('/home', require('./home.routes'));
+router.use('/branches', require('./branch.routes'));
+router.use('/special-orders', require('./specialOrder.routes'));
+
 module.exports = router;

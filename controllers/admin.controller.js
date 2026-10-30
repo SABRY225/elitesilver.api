@@ -1,12 +1,11 @@
 // controllers/adminController.js
 
 const e = require('express');
-const { Order, Product, Category, User, Rating, OrderSilver, CustomOrder, OrderCashierSystem } = require('../models');
+const { Order, Product, Category, User, Rating, OrderSilver, CustomOrder, OrderCashierSystem, SpecialOrder } = require('../models');
 
 exports.getDashboardStats = async (req, res) => {
   try {
     const stats = {
-      // 1. الإحصائيات الأساسية
       ordersCount: await Order.count() + await OrderSilver.count() + await OrderCashierSystem.count(),
       CustomOrdersCount: await CustomOrder.count(),
       categoriesCount: await Category.count(),
@@ -16,7 +15,6 @@ exports.getDashboardStats = async (req, res) => {
       adminsCount:await User.count({where:{role:'admin'}}),
       clientsCount:await User.count({where:{role:'customer'}}),
 
-      // 2. توزيع حالات الطلبات (إضافي)
       orderStatusDistribution: {
         new: await Order.count({ where: { status: 'جديد' } })+ await OrderSilver.count({ where: { status: 'جديد' } }) + await OrderCashierSystem.count({ where: { status: 'new' } }),
         pending: await Order.count({ where: { status: 'قيد التنفيذ' } })+ await OrderSilver.count({ where: { status: 'قيد التنفيذ' } }) + await OrderCashierSystem.count({ where: { status: 'pending' } }),
@@ -44,7 +42,7 @@ exports.getAllProducts = async (req, res) => {
     const { categoryId } = req.query;
     const filter = categoryId ? { where: { categoryId  } } : {};
     const products = await Product.findAll({ ...filter, include: 'category' });
-    res.json(products);
+    res.status(200).json(products);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -54,7 +52,7 @@ exports.getAllProducts = async (req, res) => {
 exports.getAdmins = async(req, res) => {
   try {
     const admins =await User.findAll({where:{role:"admin"}});
-    res.json(admins);
+    res.status(200).json(admins);
   } catch (error) {
     res.status(500).json({ 
       success: false,
@@ -75,7 +73,7 @@ exports.getAdmin = async(req, res) => {
         message: "المسؤول غير موجود"
       });
     }
-    res.json({
+    res.status(200).json({
       success: true,
       data: {
         id: admin.id,
@@ -273,4 +271,69 @@ exports.deleteAdmin = async(req, res) => {
       error: error.message
     });
   }
-}
+};
+
+// Special Orders (طلبات المناسبات والهدايا)
+exports.getSpecialOrders = async (req, res) => {
+  try {
+    const orders = await SpecialOrder.findAll({
+      order: [['id', 'DESC']]
+    });
+    res.json(orders);
+  } catch (error) {
+    console.error("Get Special Orders Error:", error);
+    res.status(500).json({ success: false, message: "فشل في جلب طلبات المناسبات", error: error.message });
+  }
+};
+
+exports.updateSpecialOrderStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const order = await SpecialOrder.findByPk(id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: "الطلب غير موجود" });
+    }
+    await order.update({ status });
+    res.json({ success: true, message: "تم تحديث حالة الطلب بنجاح", data: order });
+  } catch (error) {
+    console.error("Update Special Order Status Error:", error);
+    res.status(500).json({ success: false, message: "فشل في تحديث حالة الطلب", error: error.message });
+  }
+};
+
+exports.createSpecialOrder = async (req, res) => {
+  try {
+    const { customerName, phone, occasion, budget, description } = req.body;
+    if (!customerName || !phone) {
+      return res.status(400).json({ success: false, message: "اسم العميل ورقم الهاتف مطلوبان" });
+    }
+    const order = await SpecialOrder.create({
+      customerName,
+      phone,
+      occasion,
+      budget: budget || 0,
+      description,
+      status: 'جديد'
+    });
+    res.status(201).json({ success: true, message: "تم إنشاء طلب المناسبة بنجاح", data: order });
+  } catch (error) {
+    console.error("Create Special Order Error:", error);
+    res.status(500).json({ success: false, message: "فشل في إنشاء الطلب", error: error.message });
+  }
+};
+
+exports.deleteSpecialOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const order = await SpecialOrder.findByPk(id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: "الطلب غير موجود" });
+    }
+    await order.destroy();
+    res.json({ success: true, message: "تم حذف الطلب بنجاح" });
+  } catch (error) {
+    console.error("Delete Special Order Error:", error);
+    res.status(500).json({ success: false, message: "فشل في حذف الطلب", error: error.message });
+  }
+};

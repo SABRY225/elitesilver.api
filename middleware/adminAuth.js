@@ -17,9 +17,7 @@ const adminAuth = async (req, res, next) => {
     req.user = user;
     next();
   } catch (e) {
-        console.log(req.header('Authorization').replace('Bearer ', ''));
-    
-    res.status(403).send({ error: 'غير مسموح لك بالوصول. هذه الصلاحية للمديرين فقط.' });
+    res.status(403).json({ success: false, error: 'غير مسموح لك بالوصول. هذه الصلاحية للمديرين فقط.' });
   }
 };
 

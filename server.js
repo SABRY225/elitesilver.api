@@ -15,6 +15,7 @@ const cors = require('cors');
 const app = express();
 const db = require('./models');
 require('./services/stockNotifier');
+require('./services/dailyRegisterNotifier');
 // Middlewares
 app.use(cors({
   origin: '*',
@@ -53,7 +54,7 @@ db.sequelize.authenticate()
   })
   .then(() => {
     app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`🚀 EliteSilver Server running on port ${PORT}`);
     });
   })
   .catch(err => {

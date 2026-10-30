@@ -27,6 +27,14 @@ db.Commission = require('./Commission')(sequelize, DataTypes);
 db.CustomOrder = require('./CustomOrder')(sequelize, DataTypes);
 db.OrderCashierSystem = require('./OrderCashierSystem')(sequelize, DataTypes);
 db.OrderItemCashier = require('./OrderItemCashier')(sequelize, DataTypes);
+db.Branch = require('./Branch')(sequelize, DataTypes);
+db.BranchEmployee = require('./BranchEmployee')(sequelize, DataTypes);
+db.BranchInvoice = require('./BranchInvoice')(sequelize, DataTypes);
+db.BranchDailyRegister = require('./BranchDailyRegister')(sequelize, DataTypes);
+db.BranchInventoryAudit = require('./BranchInventoryAudit')(sequelize, DataTypes);
+db.EmployeeAdvance = require('./EmployeeAdvance')(sequelize, DataTypes);
+db.EmployeeAttendance = require('./EmployeeAttendance')(sequelize, DataTypes);
+db.SpecialOrder = require('./SpecialOrder')(sequelize, DataTypes);
 
 
 // تفعيل العلاقات
