@@ -84,6 +84,268 @@ exports.getBranchById = async (req, res) => {
   }
 };
 
+// إحصائيات ومبيعات الفرع مع إمكانية تحديد الفترة (الشهر الحالي أو فترة محددة)
+exports.getBranchStatistics = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { period, month, fromDate, toDate } = req.query;
+
+    const branch = await Branch.findByPk(id, {
+      include: [
+        {
+          model: BranchEmployee,
+          as: 'employees',
+          attributes: ['id', 'name', 'username', 'phone', 'salary', 'targetSales', 'targetGrams', 'isActive']
+        }
+      ]
+    });
+
+    if (!branch) {
+      return res.status(404).json({ success: false, message: "الفرع غير موجود" });
+    }
+
+    // تحديد شرط التاريخ (Where clause for date)
+    let dateWhere = {};
+    let resolvedPeriodLabel = '';
+    const now = new Date();
+    const currentMonth = now.toISOString().slice(0, 7); // YYYY-MM
+
+    if (fromDate && toDate) {
+      dateWhere = { [Op.between]: [fromDate, toDate] };
+      resolvedPeriodLabel = `الفترة من ${fromDate} إلى ${toDate}`;
+    } else if (month) {
+      dateWhere = { [Op.like]: `${month}%` };
+      resolvedPeriodLabel = `شهر ${month}`;
+    } else if (period === 'last_month') {
+      const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastMonth = lastMonthDate.toISOString().slice(0, 7);
+      dateWhere = { [Op.like]: `${lastMonth}%` };
+      resolvedPeriodLabel = `الشهر الماضي (${lastMonth})`;
+    } else if (period === 'all_time') {
+      dateWhere = {};
+      resolvedPeriodLabel = 'كافة الفترات (جميع المبيعات)';
+    } else {
+      // الافتراضي: الشهر الحالي
+      dateWhere = { [Op.like]: `${currentMonth}%` };
+      resolvedPeriodLabel = `الشهر الحالي (${currentMonth})`;
+    }
+
+    // 1. جلب فواتير الفرع في هذه الفترة
+    const invoiceWhere = { branchId: id };
+    if (Object.keys(dateWhere).length > 0) {
+      invoiceWhere.date = dateWhere;
+    }
+
+    const invoices = await BranchInvoice.findAll({
+      where: invoiceWhere,
+      include: [
+        { model: BranchEmployee, as: 'employee', attributes: ['id', 'name', 'username'] }
+      ],
+      order: [['date', 'DESC'], ['id', 'DESC']]
+    });
+
+    // 2. جلب السجلات اليومية للفرع في هذه الفترة
+    const registerWhere = { branchId: id };
+    if (Object.keys(dateWhere).length > 0) {
+      registerWhere.date = dateWhere;
+    }
+
+    const dailyRegisters = await BranchDailyRegister.findAll({
+      where: registerWhere,
+      include: [
+        { model: BranchEmployee, as: 'employee', attributes: ['id', 'name', 'username'] }
+      ],
+      order: [['date', 'DESC']]
+    });
+
+    // 3. احتساب الإحصائيات المالية
+    let totalInvoiceSales = 0;
+    let cashSales = 0;
+    let visaSales = 0;
+    let totalDiscount = 0;
+    let totalGramsSold = 0;
+
+    const employeeSalesMap = {};
+    (branch.employees || []).forEach(emp => {
+      employeeSalesMap[emp.id] = {
+        employee: emp,
+        sales: 0,
+        grams: 0,
+        invoicesCount: 0
+      };
+    });
+
+    const timelineMap = {};
+
+    invoices.forEach(inv => {
+      const total = parseFloat(inv.total) || 0;
+      const discount = parseFloat(inv.discount) || 0;
+      totalInvoiceSales += total;
+      totalDiscount += discount;
+
+      const isVisa = inv.paymentType !== 'نقدي';
+      if (isVisa) {
+        visaSales += total;
+      } else {
+        cashSales += total;
+      }
+
+      let invItems = [];
+      if (Array.isArray(inv.items)) {
+        invItems = inv.items;
+      } else if (typeof inv.items === 'string') {
+        try { invItems = JSON.parse(inv.items); } catch (e) { invItems = []; }
+      }
+
+      let invoiceGrams = 0;
+      invItems.forEach(it => {
+        const c = parseFloat(it.count) > 0 ? parseFloat(it.count) : 1;
+        const w = parseFloat(it.makerFeeGram) || 0;
+        invoiceGrams += (c * w);
+      });
+      totalGramsSold += invoiceGrams;
+
+      if (inv.employeeId) {
+        if (!employeeSalesMap[inv.employeeId]) {
+          employeeSalesMap[inv.employeeId] = {
+            employee: inv.employee || { id: inv.employeeId, name: inv.employeeName || 'موظف' },
+            sales: 0,
+            grams: 0,
+            invoicesCount: 0
+          };
+        }
+        employeeSalesMap[inv.employeeId].sales += total;
+        employeeSalesMap[inv.employeeId].grams += invoiceGrams;
+        employeeSalesMap[inv.employeeId].invoicesCount += 1;
+      }
+
+      const d = inv.date;
+      if (!timelineMap[d]) {
+        timelineMap[d] = {
+          date: d,
+          sales: 0,
+          cashSales: 0,
+          visaSales: 0,
+          grams: 0,
+          expenses: 0,
+          invoicesCount: 0
+        };
+      }
+      timelineMap[d].sales += total;
+      if (isVisa) timelineMap[d].visaSales += total;
+      else timelineMap[d].cashSales += total;
+      timelineMap[d].grams += invoiceGrams;
+      timelineMap[d].invoicesCount += 1;
+    });
+
+    // 4. احتساب مصاريف وسجلات اليومية
+    let totalExpenses = 0;
+    let registersTotalSales = 0;
+    let registersGrams = 0;
+    let brokenSilverGrams = 0;
+    let brokenGoldGrams = 0;
+
+    dailyRegisters.forEach(reg => {
+      const exp = parseFloat(reg.totalExpenses) || 0;
+      const rSales = parseFloat(reg.totalSales) || 0;
+      const rGrams = parseFloat(reg.totalGrams) || 0;
+      const bSilver = parseFloat(reg.brokenSilverGrams) || 0;
+      const bGold = parseFloat(reg.brokenGoldGrams) || 0;
+
+      totalExpenses += exp;
+      registersTotalSales += rSales;
+      registersGrams += rGrams;
+      brokenSilverGrams += bSilver;
+      brokenGoldGrams += bGold;
+
+      const d = reg.date;
+      if (!timelineMap[d]) {
+        timelineMap[d] = {
+          date: d,
+          sales: rSales,
+          cashSales: 0,
+          visaSales: parseFloat(reg.totalVisaSales) || 0,
+          grams: rGrams,
+          expenses: exp,
+          invoicesCount: 0
+        };
+      } else {
+        timelineMap[d].expenses += exp;
+      }
+    });
+
+    const finalSales = totalInvoiceSales > 0 ? totalInvoiceSales : registersTotalSales;
+    const finalGrams = totalGramsSold > 0 ? totalGramsSold : registersGrams;
+    const netTotal = finalSales - totalExpenses;
+    const avgInvoice = invoices.length > 0 ? (totalInvoiceSales / invoices.length) : 0;
+
+    const employeePerformances = Object.values(employeeSalesMap).map(item => {
+      const share = finalSales > 0 ? ((item.sales / finalSales) * 100).toFixed(1) : 0;
+      return {
+        ...item,
+        sales: item.sales.toFixed(3),
+        grams: item.grams.toFixed(3),
+        salesSharePercentage: Number(share)
+      };
+    }).sort((a, b) => parseFloat(b.sales) - parseFloat(a.sales));
+
+    const timeline = Object.values(timelineMap)
+      .map(t => ({
+        ...t,
+        sales: t.sales.toFixed(3),
+        cashSales: t.cashSales.toFixed(3),
+        visaSales: t.visaSales.toFixed(3),
+        grams: t.grams.toFixed(3),
+        expenses: t.expenses.toFixed(3),
+        net: (t.sales - t.expenses).toFixed(3)
+      }))
+      .sort((a, b) => b.date.localeCompare(a.date));
+
+    res.json({
+      success: true,
+      branch: {
+        id: branch.id,
+        name: branch.name,
+        code: branch.code,
+        city: branch.city,
+        address: branch.address,
+        phone: branch.phone,
+        managerName: branch.managerName,
+        employeesCount: (branch.employees || []).length
+      },
+      period: {
+        label: resolvedPeriodLabel,
+        month: month || (period === 'last_month' ? 'last_month' : currentMonth),
+        fromDate: fromDate || null,
+        toDate: toDate || null
+      },
+      statistics: {
+        totalSales: finalSales.toFixed(3),
+        invoiceSales: totalInvoiceSales.toFixed(3),
+        registerSales: registersTotalSales.toFixed(3),
+        cashSales: cashSales.toFixed(3),
+        visaSales: visaSales.toFixed(3),
+        totalExpenses: totalExpenses.toFixed(3),
+        netTotal: netTotal.toFixed(3),
+        totalDiscount: totalDiscount.toFixed(3),
+        totalGramsSold: finalGrams.toFixed(3),
+        brokenSilverGrams: brokenSilverGrams.toFixed(3),
+        brokenGoldGrams: brokenGoldGrams.toFixed(3),
+        invoicesCount: invoices.length,
+        dailyRegistersCount: dailyRegisters.length,
+        averageInvoiceValue: avgInvoice.toFixed(3)
+      },
+      employees: employeePerformances,
+      timeline,
+      recentInvoices: invoices.slice(0, 15),
+      recentRegisters: dailyRegisters.slice(0, 10)
+    });
+  } catch (error) {
+    console.error("Error fetching branch statistics:", error);
+    res.status(500).json({ success: false, message: "فشل في جلب إحصائيات الفرع", error: error.message });
+  }
+};
+
 exports.createBranch = async (req, res) => {
   try {
     const { name, code, city, address, phone, phone2, phone3, managerName, isActive, notes } = req.body;
@@ -182,7 +444,7 @@ exports.getAllEmployees = async (req, res) => {
 
 exports.createBranchEmployee = async (req, res) => {
   try {
-    const { branchId, name, username, password, phone, email, salary, nationalId } = req.body;
+    const { branchId, name, username, password, phone, email, salary, nationalId, targetSales, targetGrams } = req.body;
     if (!branchId || !name || !username || !password) {
       return res.status(400).json({ success: false, message: "يرجى تعبئة جميع الحقول الإلزامية: الفرع، الاسم، اسم المستخدم، كلمة المرور" });
     }
@@ -205,6 +467,8 @@ exports.createBranchEmployee = async (req, res) => {
       phone,
       email: email ? email.trim() : null,
       salary: salary !== undefined && salary !== '' ? parseFloat(salary) : 0,
+      targetSales: targetSales !== undefined && targetSales !== '' ? parseFloat(targetSales) : 0,
+      targetGrams: targetGrams !== undefined && targetGrams !== '' ? parseFloat(targetGrams) : 0,
       nationalId,
       isActive: true
     });
@@ -227,7 +491,7 @@ exports.updateBranchEmployee = async (req, res) => {
       return res.status(404).json({ success: false, message: "الموظف غير موجود" });
     }
 
-    const { branchId, name, username, password, phone, email, salary, nationalId, isActive } = req.body;
+    const { branchId, name, username, password, phone, email, salary, nationalId, isActive, targetSales, targetGrams } = req.body;
 
     if (username && username.toLowerCase().trim() !== employee.username) {
       const existing = await BranchEmployee.findOne({ where: { username: username.toLowerCase().trim() } });
@@ -242,6 +506,8 @@ exports.updateBranchEmployee = async (req, res) => {
     if (phone !== undefined) employee.phone = phone;
     if (email !== undefined) employee.email = email ? email.trim() : null;
     if (salary !== undefined) employee.salary = salary !== '' ? parseFloat(salary) : 0;
+    if (targetSales !== undefined) employee.targetSales = targetSales !== '' ? parseFloat(targetSales) : 0;
+    if (targetGrams !== undefined) employee.targetGrams = targetGrams !== '' ? parseFloat(targetGrams) : 0;
     if (nationalId !== undefined) employee.nationalId = nationalId;
     if (isActive !== undefined) employee.isActive = isActive;
     if (password && password.trim() !== '') {
@@ -256,6 +522,202 @@ exports.updateBranchEmployee = async (req, res) => {
     res.json({ success: true, message: "تم تحديث بيانات الموظف بنجاح", data: safeEmployee });
   } catch (error) {
     res.status(500).json({ success: false, message: "فشل في تحديث بيانات الموظف", error: error.message });
+  }
+};
+
+// تحديث سريع لتارجت المبيعات وتارجت الجرامات لموظف
+exports.updateEmployeeTargets = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { targetSales, targetGrams } = req.body;
+
+    const employee = await BranchEmployee.findByPk(id, {
+      include: [{ model: Branch, as: 'branch', attributes: ['id', 'name'] }]
+    });
+
+    if (!employee) {
+      return res.status(404).json({ success: false, message: "الموظف غير موجود" });
+    }
+
+    if (targetSales !== undefined) {
+      employee.targetSales = targetSales !== '' ? parseFloat(targetSales) : 0;
+    }
+    if (targetGrams !== undefined) {
+      employee.targetGrams = targetGrams !== '' ? parseFloat(targetGrams) : 0;
+    }
+
+    await employee.save();
+
+    res.json({
+      success: true,
+      message: `تم تحديث تارجت الموظف (${employee.name}) بنجاح`,
+      data: {
+        id: employee.id,
+        name: employee.name,
+        targetSales: employee.targetSales,
+        targetGrams: employee.targetGrams
+      }
+    });
+  } catch (error) {
+    console.error("Error updating employee targets:", error);
+    res.status(500).json({ success: false, message: "فشل في تحديث تارجت الموظف", error: error.message });
+  }
+};
+
+// متابعة أداء وتارجت موظفي الفروع (بالفلوس وبالجرامات)
+exports.getEmployeeTargetsPerformance = async (req, res) => {
+  try {
+    const { branchId, month, fromDate, toDate } = req.query;
+
+    // تحديد الشهر المطلوب أو الحالي افتراضياً (YYYY-MM)
+    const targetMonth = month || new Date().toISOString().slice(0, 7);
+
+    let dateWhere = {};
+    if (fromDate && toDate) {
+      dateWhere = { [Op.between]: [fromDate, toDate] };
+    } else if (targetMonth) {
+      dateWhere = { [Op.like]: `${targetMonth}%` };
+    }
+
+    const empWhere = {};
+    if (branchId) empWhere.branchId = branchId;
+
+    const employees = await BranchEmployee.findAll({
+      where: empWhere,
+      include: [{ model: Branch, as: 'branch', attributes: ['id', 'name', 'city'] }],
+      attributes: { exclude: ['password'] },
+      order: [['id', 'ASC']]
+    });
+
+    const performanceData = await Promise.all(employees.map(async (emp) => {
+      // 1. جلب فواتير الموظف في الفترة المحددة
+      const invoices = await BranchInvoice.findAll({
+        where: {
+          employeeId: emp.id,
+          date: dateWhere
+        },
+        order: [['date', 'DESC']]
+      });
+
+      let achievedSales = 0;
+      let achievedGrams = 0;
+
+      invoices.forEach(inv => {
+        achievedSales += parseFloat(inv.total) || 0;
+
+        let invItems = [];
+        if (Array.isArray(inv.items)) {
+          invItems = inv.items;
+        } else if (typeof inv.items === 'string') {
+          try { invItems = JSON.parse(inv.items); } catch (e) { invItems = []; }
+        }
+
+        invItems.forEach(item => {
+          const count = parseFloat(item.count) > 0 ? parseFloat(item.count) : 1;
+          const weight = parseFloat(item.makerFeeGram) || 0;
+          achievedGrams += (count * weight);
+        });
+      });
+
+      // 2. فحص السجلات اليومية للموظف في حال وجود مبيعات أو جرامات مسجلة
+      const registers = await BranchDailyRegister.findAll({
+        where: {
+          employeeId: emp.id,
+          date: dateWhere
+        }
+      });
+
+      let registerGrams = 0;
+      registers.forEach(reg => {
+        registerGrams += parseFloat(reg.totalGrams) || 0;
+      });
+
+      if (registerGrams > achievedGrams) {
+        achievedGrams = registerGrams;
+      }
+
+      const targetSales = parseFloat(emp.targetSales) || 0;
+      const targetGrams = parseFloat(emp.targetGrams) || 0;
+
+      const salesPercentage = targetSales > 0 ? (achievedSales / targetSales) * 100 : 0;
+      const gramsPercentage = targetGrams > 0 ? (achievedGrams / targetGrams) * 100 : 0;
+
+      const salesRemaining = Math.max(0, targetSales - achievedSales);
+      const gramsRemaining = Math.max(0, targetGrams - achievedGrams);
+
+      let overallStatus = 'in_progress';
+      if (targetSales > 0 && targetGrams > 0) {
+        if (achievedSales >= targetSales && achievedGrams >= targetGrams) {
+          overallStatus = 'completed'; // محقق بالكامل
+        } else if (achievedSales >= targetSales || achievedGrams >= targetGrams) {
+          overallStatus = 'partial'; // محقق جزئياً
+        } else if (salesPercentage >= 70 && gramsPercentage >= 70) {
+          overallStatus = 'on_track'; // أداء متقدم
+        }
+      } else if (targetSales > 0 && achievedSales >= targetSales) {
+        overallStatus = 'completed';
+      } else if (targetGrams > 0 && achievedGrams >= targetGrams) {
+        overallStatus = 'completed';
+      }
+
+      return {
+        employee: emp,
+        period: targetMonth,
+        targetSales: targetSales.toFixed(3),
+        achievedSales: achievedSales.toFixed(3),
+        salesPercentage: Number(salesPercentage.toFixed(1)),
+        salesRemaining: salesRemaining.toFixed(3),
+
+        targetGrams: targetGrams.toFixed(3),
+        achievedGrams: achievedGrams.toFixed(3),
+        gramsPercentage: Number(gramsPercentage.toFixed(1)),
+        gramsRemaining: gramsRemaining.toFixed(3),
+
+        invoicesCount: invoices.length,
+        registersCount: registers.length,
+        overallStatus,
+        recentInvoices: invoices.slice(0, 5)
+      };
+    }));
+
+    // ملخص عام للأداء
+    let totalTargetSales = 0;
+    let totalAchievedSales = 0;
+    let totalTargetGrams = 0;
+    let totalAchievedGrams = 0;
+
+    performanceData.forEach(p => {
+      totalTargetSales += parseFloat(p.targetSales) || 0;
+      totalAchievedSales += parseFloat(p.achievedSales) || 0;
+      totalTargetGrams += parseFloat(p.targetGrams) || 0;
+      totalAchievedGrams += parseFloat(p.achievedGrams) || 0;
+    });
+
+    const totalSalesPercentage = totalTargetSales > 0 ? ((totalAchievedSales / totalTargetSales) * 100).toFixed(1) : 0;
+    const totalGramsPercentage = totalTargetGrams > 0 ? ((totalAchievedGrams / totalTargetGrams) * 100).toFixed(1) : 0;
+
+    const sortedBySales = [...performanceData].sort((a, b) => parseFloat(b.achievedSales) - parseFloat(a.achievedSales));
+    const sortedByGrams = [...performanceData].sort((a, b) => parseFloat(b.achievedGrams) - parseFloat(a.achievedGrams));
+
+    res.json({
+      success: true,
+      period: targetMonth,
+      summary: {
+        totalTargetSales: totalTargetSales.toFixed(3),
+        totalAchievedSales: totalAchievedSales.toFixed(3),
+        totalSalesPercentage: Number(totalSalesPercentage),
+        totalTargetGrams: totalTargetGrams.toFixed(3),
+        totalAchievedGrams: totalAchievedGrams.toFixed(3),
+        totalGramsPercentage: Number(totalGramsPercentage),
+        totalEmployees: employees.length,
+        topSalesPerformer: sortedBySales[0] || null,
+        topGramsPerformer: sortedByGrams[0] || null,
+      },
+      data: performanceData
+    });
+  } catch (error) {
+    console.error("Error calculating employee targets performance:", error);
+    res.status(500).json({ success: false, message: "فشل في احتساب أداء وتارجت الموظفين", error: error.message });
   }
 };
 
@@ -379,10 +841,53 @@ exports.getEmployeeMe = async (req, res) => {
       return res.status(404).json({ success: false, message: "الموظف غير موجود" });
     }
 
+    // احتساب إنجاز تارجت الشهر الحالي للموظف
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const invoices = await BranchInvoice.findAll({
+      where: {
+        employeeId: employee.id,
+        date: { [Op.like]: `${currentMonth}%` }
+      }
+    });
+
+    let monthSales = 0;
+    let monthGrams = 0;
+    invoices.forEach(inv => {
+      monthSales += parseFloat(inv.total) || 0;
+      let items = [];
+      if (Array.isArray(inv.items)) items = inv.items;
+      else if (typeof inv.items === 'string') {
+        try { items = JSON.parse(inv.items); } catch(e) { items = []; }
+      }
+      items.forEach(it => {
+        const c = parseFloat(it.count) > 0 ? parseFloat(it.count) : 1;
+        const w = parseFloat(it.makerFeeGram) || 0;
+        monthGrams += (c * w);
+      });
+    });
+
+    const targetSales = parseFloat(employee.targetSales) || 0;
+    const targetGrams = parseFloat(employee.targetGrams) || 0;
+
+    const targetProgress = {
+      month: currentMonth,
+      targetSales,
+      monthSales: Number(monthSales.toFixed(3)),
+      salesPercentage: targetSales > 0 ? Number(((monthSales / targetSales) * 100).toFixed(1)) : 0,
+      salesRemaining: Math.max(0, targetSales - monthSales).toFixed(3),
+
+      targetGrams,
+      monthGrams: Number(monthGrams.toFixed(3)),
+      gramsPercentage: targetGrams > 0 ? Number(((monthGrams / targetGrams) * 100).toFixed(1)) : 0,
+      gramsRemaining: Math.max(0, targetGrams - monthGrams).toFixed(3),
+      invoicesCount: invoices.length
+    };
+
     res.json({
       success: true,
       employee,
-      branch: employee.branch
+      branch: employee.branch,
+      targetProgress
     });
   } catch (error) {
     res.status(500).json({ success: false, message: "فشل في جلب بيانات الموظف", error: error.message });
@@ -415,6 +920,39 @@ exports.getNextInvoiceNumber = async (req, res) => {
   }
 };
 
+// استخراج معرفات وأرقام الفواتير المستبعدة من السجل اليومي
+function getExcludedInvoiceIds(notes) {
+  if (!notes) return [];
+  const match = notes.match(/\[EXCLUDED_INVOICES:([^\]]*)\]/);
+  if (!match) return [];
+  return match[1].split(',').map(s => s.trim()).filter(Boolean);
+}
+
+// إضافة فاتورة إلى قائمة الفواتير المستبعدة من السجل اليومي
+function addExcludedInvoiceId(notes, invoiceId, invoiceNumber) {
+  let currentNotes = notes || '';
+  const match = currentNotes.match(/\[EXCLUDED_INVOICES:([^\]]*)\]/);
+  let ids = [];
+  if (match) {
+    ids = match[1].split(',').map(s => s.trim()).filter(Boolean);
+  }
+  if (invoiceId) {
+    const idStr = String(invoiceId);
+    if (!ids.includes(idStr)) ids.push(idStr);
+  }
+  if (invoiceNumber) {
+    const numStr = String(invoiceNumber);
+    if (!ids.includes(`num_${numStr}`)) ids.push(`num_${numStr}`);
+  }
+
+  const tag = `[EXCLUDED_INVOICES:${ids.join(',')}]`;
+  if (match) {
+    return currentNotes.replace(/\[EXCLUDED_INVOICES:[^\]]*\]/, tag);
+  } else {
+    return currentNotes ? `${currentNotes} ${tag}` : tag;
+  }
+}
+
 // مزامنة فواتير اليوم في السجل اليومي
 async function syncInvoicesToDailyRegister(branchId, targetDate, employeeId, employeeName) {
   try {
@@ -435,13 +973,21 @@ async function syncInvoicesToDailyRegister(branchId, targetDate, employeeId, emp
       existingEntries = Array.isArray(register.entries) ? register.entries : JSON.parse(register.entries || '[]');
     }
 
+    const excludedIds = getExcludedInvoiceIds(register ? register.notes : '');
+
     let updatedEntries = [...existingEntries];
     let hasNew = false;
 
     for (const inv of invoices) {
       const invNum = inv.invoiceNumber;
+      if (excludedIds.includes(String(inv.id)) || excludedIds.includes(`num_${invNum}`)) {
+        // تم استبعاد هذه الفاتورة عمداً من السجل اليومي بواسطة الإدارة
+        continue;
+      }
+
       const alreadyExists = updatedEntries.some(e =>
-        e.invoiceId === inv.id ||
+        (e.invoiceId && String(e.invoiceId) === String(inv.id)) ||
+        (e.invoiceNumber && String(e.invoiceNumber) === String(invNum)) ||
         (e.weightAndDetails && e.weightAndDetails.includes(`فاتورة #${invNum}`))
       );
 
@@ -720,6 +1266,81 @@ exports.getBranchInvoices = async (req, res) => {
     res.json({ success: true, data: invoices });
   } catch (error) {
     res.status(500).json({ success: false, message: "فشل في جلب الفواتير", error: error.message });
+  }
+};
+
+// حذف فاتورة بواسطة الأدمن وتحديث السجل اليومي تلقائياً
+exports.deleteInvoice = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const invoice = await BranchInvoice.findByPk(id, {
+      include: [{ model: Branch, as: 'branch', attributes: ['id', 'name'] }]
+    });
+
+    if (!invoice) {
+      return res.status(404).json({ success: false, message: "الفاتورة غير موجودة" });
+    }
+
+    const { branchId, date, invoiceNumber } = invoice;
+    const branchName = invoice.branch?.name || `فرع #${branchId}`;
+
+    // حذف الفاتورة من جدول الفواتير
+    await invoice.destroy();
+
+    // البحث عن السجل اليومي لنفس الفرع ونفس التاريخ لإزالة الفاتورة منه إن وجدت
+    const register = await BranchDailyRegister.findOne({
+      where: { branchId, date }
+    });
+
+    if (register) {
+      let entries = [];
+      if (typeof register.entries === 'string') {
+        try { entries = JSON.parse(register.entries); } catch (e) { entries = []; }
+      } else if (Array.isArray(register.entries)) {
+        entries = [...register.entries];
+      }
+
+      const initialCount = entries.length;
+      entries = entries.filter(e => {
+        const matchesId = e.invoiceId && (String(e.invoiceId) === String(id));
+        const matchesNumber = e.invoiceNumber && (String(e.invoiceNumber) === String(invoiceNumber));
+        const matchesText = e.weightAndDetails && e.weightAndDetails.includes(`فاتورة #${invoiceNumber}`);
+        return !(matchesId || matchesNumber || matchesText);
+      });
+
+      if (entries.length !== initialCount) {
+        let salesSum = 0;
+        let expSum = 0;
+        let visaSum = 0;
+        entries.forEach(item => {
+          const s = parseFloat(item.sales) || 0;
+          const e = parseFloat(item.expenses) || 0;
+          salesSum += s;
+          expSum += e;
+          if (item.isVisa) visaSum += s;
+        });
+
+        // تسجيل الفاتورة في قائمة المستبعدين لمنع إعادة مزامنتها
+        const updatedNotes = addExcludedInvoiceId(register.notes, id, invoiceNumber);
+
+        await register.update({
+          entries,
+          totalSales: salesSum.toFixed(3),
+          totalExpenses: expSum.toFixed(3),
+          totalVisaSales: visaSum.toFixed(3),
+          netTotal: (salesSum - expSum).toFixed(3),
+          notes: updatedNotes
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `تم حذف الفاتورة #${invoiceNumber} لـ (${branchName}) بنجاح وتحديث السجل اليومي`
+    });
+  } catch (error) {
+    console.error("Error deleting invoice:", error);
+    res.status(500).json({ success: false, message: "فشل في حذف الفاتورة", error: error.message });
   }
 };
 
@@ -1113,6 +1734,185 @@ exports.getAllDailyRegistersForAdmin = async (req, res) => {
     res.json({ success: true, data: parsed });
   } catch (error) {
     res.status(500).json({ success: false, message: "فشل في جلب السجلات اليومية", error: error.message });
+  }
+};
+
+// حذف سجل يومي بالكامل بواسطة الأدمن
+exports.deleteDailyRegister = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const register = await BranchDailyRegister.findByPk(id, {
+      include: [{ model: Branch, as: 'branch', attributes: ['id', 'name'] }]
+    });
+
+    if (!register) {
+      return res.status(404).json({ success: false, message: "السجل اليومي غير موجود" });
+    }
+
+    const branchName = register.branch?.name || `فرع #${register.branchId}`;
+    const date = register.date;
+
+    await register.destroy();
+
+    res.json({
+      success: true,
+      message: `تم حذف السجل اليومي لـ (${branchName}) بتاريخ ${date} بنجاح`
+    });
+  } catch (error) {
+    console.error("Error deleting daily register:", error);
+    res.status(500).json({ success: false, message: "فشل في حذف السجل اليومي", error: error.message });
+  }
+};
+
+// إزالة فاتورة محددة من السجل اليومي مع إعادة حساب المجاميع واستبعادها من المزامنة التلقائية
+exports.removeInvoiceFromDailyRegister = async (req, res) => {
+  try {
+    const { id } = req.params; // registerId
+    const { invoiceId, invoiceNumber, entryId } = req.body;
+
+    const register = await BranchDailyRegister.findByPk(id, {
+      include: [
+        { model: Branch, as: 'branch', attributes: ['id', 'name', 'city'] },
+        { model: BranchEmployee, as: 'employee', attributes: ['id', 'name', 'username'] }
+      ]
+    });
+
+    if (!register) {
+      return res.status(404).json({ success: false, message: "السجل اليومي غير موجود" });
+    }
+
+    let entries = [];
+    if (typeof register.entries === 'string') {
+      try { entries = JSON.parse(register.entries); } catch (e) { entries = []; }
+    } else if (Array.isArray(register.entries)) {
+      entries = [...register.entries];
+    }
+
+    let foundInvoiceId = invoiceId;
+    let foundInvoiceNumber = invoiceNumber;
+
+    const newEntries = entries.filter(e => {
+      const matchEntryId = entryId && (String(e.id) === String(entryId));
+      const matchInvoiceId = invoiceId && (String(e.invoiceId) === String(invoiceId));
+      const matchInvoiceNum = invoiceNumber && (
+        String(e.invoiceNumber) === String(invoiceNumber) ||
+        (e.weightAndDetails && e.weightAndDetails.includes(`فاتورة #${invoiceNumber}`))
+      );
+
+      if (matchEntryId || matchInvoiceId || matchInvoiceNum) {
+        if (!foundInvoiceId && e.invoiceId) foundInvoiceId = e.invoiceId;
+        if (!foundInvoiceNumber && e.invoiceNumber) foundInvoiceNumber = e.invoiceNumber;
+        if (!foundInvoiceNumber && e.weightAndDetails) {
+          const match = e.weightAndDetails.match(/فاتورة\s*#(\d+)/);
+          if (match) foundInvoiceNumber = match[1];
+        }
+        return false; // استبعاد السطر
+      }
+      return true;
+    });
+
+    if (newEntries.length === entries.length) {
+      return res.status(404).json({ success: false, message: "لم يتم العثور على الفاتورة في هذا السجل اليومي" });
+    }
+
+    // إعادة احتساب المجاميع
+    let salesSum = 0;
+    let expSum = 0;
+    let visaSum = 0;
+    newEntries.forEach(item => {
+      const s = parseFloat(item.sales) || 0;
+      const e = parseFloat(item.expenses) || 0;
+      salesSum += s;
+      expSum += e;
+      if (item.isVisa) visaSum += s;
+    });
+
+    // استبعاد الفاتورة حتى لا تعاد إضافتها في المزامنة التلقائية
+    const updatedNotes = addExcludedInvoiceId(register.notes, foundInvoiceId, foundInvoiceNumber);
+
+    await register.update({
+      entries: newEntries,
+      totalSales: salesSum.toFixed(3),
+      totalExpenses: expSum.toFixed(3),
+      totalVisaSales: visaSum.toFixed(3),
+      netTotal: (salesSum - expSum).toFixed(3),
+      notes: updatedNotes
+    });
+
+    let formattedRegister = register.toJSON();
+    if (typeof formattedRegister.entries === 'string') {
+      try { formattedRegister.entries = JSON.parse(formattedRegister.entries); } catch (e) { formattedRegister.entries = []; }
+    } else {
+      formattedRegister.entries = newEntries;
+    }
+
+    res.json({
+      success: true,
+      message: `تم إزالة الفاتورة ${foundInvoiceNumber ? `رقم #${foundInvoiceNumber}` : ''} من السجل اليومي وتحديث المجاميع بنجاح`,
+      data: formattedRegister
+    });
+  } catch (error) {
+    console.error("Error removing invoice from daily register:", error);
+    res.status(500).json({ success: false, message: "فشل في إزالة الفاتورة من السجل اليومي", error: error.message });
+  }
+};
+
+// تعديل أو تحديث السجل اليومي للأدمن
+exports.updateDailyRegisterForAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const register = await BranchDailyRegister.findByPk(id, {
+      include: [
+        { model: Branch, as: 'branch', attributes: ['id', 'name', 'city'] },
+        { model: BranchEmployee, as: 'employee', attributes: ['id', 'name', 'username'] }
+      ]
+    });
+
+    if (!register) {
+      return res.status(404).json({ success: false, message: "السجل اليومي غير موجود" });
+    }
+
+    const {
+      entries,
+      totalGrams,
+      totalSales,
+      totalExpenses,
+      totalVisaSales,
+      netTotal,
+      totalAdvances,
+      brokenSilverGrams,
+      brokenGoldGrams,
+      status,
+      notes
+    } = req.body;
+
+    await register.update({
+      entries: entries !== undefined ? entries : register.entries,
+      totalGrams: totalGrams !== undefined ? totalGrams : register.totalGrams,
+      totalSales: totalSales !== undefined ? totalSales : register.totalSales,
+      totalExpenses: totalExpenses !== undefined ? totalExpenses : register.totalExpenses,
+      totalVisaSales: totalVisaSales !== undefined ? totalVisaSales : register.totalVisaSales,
+      netTotal: netTotal !== undefined ? netTotal : register.netTotal,
+      totalAdvances: totalAdvances !== undefined ? totalAdvances : register.totalAdvances,
+      brokenSilverGrams: brokenSilverGrams !== undefined ? brokenSilverGrams : register.brokenSilverGrams,
+      brokenGoldGrams: brokenGoldGrams !== undefined ? brokenGoldGrams : register.brokenGoldGrams,
+      status: status !== undefined ? status : register.status,
+      notes: notes !== undefined ? notes : register.notes
+    });
+
+    let formattedRegister = register.toJSON();
+    if (typeof formattedRegister.entries === 'string') {
+      try { formattedRegister.entries = JSON.parse(formattedRegister.entries); } catch (e) { formattedRegister.entries = []; }
+    }
+
+    res.json({
+      success: true,
+      message: "تم تحديث السجل اليومي بنجاح",
+      data: formattedRegister
+    });
+  } catch (error) {
+    console.error("Error updating daily register:", error);
+    res.status(500).json({ success: false, message: "فشل في تحديث السجل اليومي", error: error.message });
   }
 };
 

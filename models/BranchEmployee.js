@@ -39,6 +39,16 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: 0,
         allowNull: true,
       },
+      targetSales: {
+        type: DataTypes.DECIMAL(10, 3),
+        defaultValue: 0,
+        allowNull: true,
+      },
+      targetGrams: {
+        type: DataTypes.DECIMAL(10, 3),
+        defaultValue: 0,
+        allowNull: true,
+      },
       nationalId: {
         type: DataTypes.STRING,
         allowNull: true,

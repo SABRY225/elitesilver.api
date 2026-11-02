@@ -50,9 +50,23 @@ const PORT = process.env.PORT || 5000;
 db.sequelize.authenticate()
   .then(() => {
     console.log('✅ Database Connected');
-    return db.sequelize.sync({ alter:0});
+    return db.sequelize.sync({ alter: 0 });
   })
-  .then(() => {
+  .then(async () => {
+    try {
+      const [cols] = await db.sequelize.query("SHOW COLUMNS FROM branch_employees LIKE 'targetSales'");
+      if (!cols || cols.length === 0) {
+        await db.sequelize.query("ALTER TABLE branch_employees ADD COLUMN targetSales DECIMAL(10, 3) DEFAULT 0");
+        console.log('✅ Added targetSales column to branch_employees');
+      }
+      const [colsGrams] = await db.sequelize.query("SHOW COLUMNS FROM branch_employees LIKE 'targetGrams'");
+      if (!colsGrams || colsGrams.length === 0) {
+        await db.sequelize.query("ALTER TABLE branch_employees ADD COLUMN targetGrams DECIMAL(10, 3) DEFAULT 0");
+        console.log('✅ Added targetGrams column to branch_employees');
+      }
+    } catch (e) {
+      // إكمال التشغيل
+    }
     app.listen(PORT, () => {
       console.log(`🚀 EliteSilver Server running on port ${PORT}`);
     });
