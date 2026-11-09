@@ -6,11 +6,20 @@ const employeeAuth = require('../middleware/employeeAuth');
 const {
   // Branches
   getAllBranches,
+  getPublicBranches,
   getBranchById,
   getBranchStatistics,
+  getBranchPurchasesReport,
+  getAggregateStatistics,
   createBranch,
   updateBranch,
   deleteBranch,
+
+  // Fixed Expenses
+  getBranchFixedExpenses,
+  createBranchFixedExpense,
+  updateBranchFixedExpense,
+  deleteBranchFixedExpense,
 
   // Employees
   getAllEmployees,
@@ -19,22 +28,28 @@ const {
   deleteBranchEmployee,
   updateEmployeeTargets,
   getEmployeeTargetsPerformance,
+  syncOldInvoicesToEmployeeTargets,
 
   // Employee Auth
   employeeLogin,
+  switchBranch,
   getEmployeeMe,
+  getBranchEmployeesForEmployee,
 
   // Invoices
   getNextInvoiceNumber,
   createInvoice,
   getBranchInvoices,
   deleteInvoice,
+  createInvoiceForAdmin,
 
   // Daily Registers
   getTodayDailyRegister,
   saveDailyRegister,
   closeDailyRegister,
   getAllDailyRegistersForAdmin,
+  getDailyRegisterById,
+  createDailyRegisterForAdmin,
   updateDailyRegisterForAdmin,
   deleteDailyRegister,
   removeInvoiceFromDailyRegister,
@@ -64,8 +79,11 @@ const {
 // ============================
 // 1. مسارات موظف الفرع (Employee Portal)
 // ============================
+router.get('/public-branches', getPublicBranches);
 router.post('/employee/login', employeeLogin);
+router.post('/employee/switch-branch', employeeAuth, switchBranch);
 router.get('/employee/me', employeeAuth, getEmployeeMe);
+router.get('/employee/branch-employees', employeeAuth, getBranchEmployeesForEmployee);
 
 // الفواتير لموظف الفرع
 router.get('/employee/next-invoice-number', employeeAuth, getNextInvoiceNumber);
@@ -90,11 +108,20 @@ router.get('/employee/attendance', employeeAuth, getMyAttendance);
 // ============================
 // الفروع
 router.get('/admin/branches', adminAuth, getAllBranches);
+router.get('/admin/aggregate-statistics', adminAuth, getAggregateStatistics);
+router.get('/admin/branches/aggregate-statistics', adminAuth, getAggregateStatistics);
 router.get('/admin/branches/:id', adminAuth, getBranchById);
 router.get('/admin/branches/:id/statistics', adminAuth, getBranchStatistics);
+router.get('/admin/branches/:id/purchases-report', adminAuth, getBranchPurchasesReport);
 router.post('/admin/branches', adminAuth, createBranch);
 router.put('/admin/branches/:id', adminAuth, updateBranch);
 router.delete('/admin/branches/:id', adminAuth, deleteBranch);
+
+// المصروفات الثابتة الشهرية للفروع
+router.get('/admin/fixed-expenses', adminAuth, getBranchFixedExpenses);
+router.post('/admin/fixed-expenses', adminAuth, createBranchFixedExpense);
+router.put('/admin/fixed-expenses/:id', adminAuth, updateBranchFixedExpense);
+router.delete('/admin/fixed-expenses/:id', adminAuth, deleteBranchFixedExpense);
 
 // موظفي الفروع
 router.get('/admin/employees', adminAuth, getAllEmployees);
@@ -103,6 +130,7 @@ router.put('/admin/employees/:id', adminAuth, updateBranchEmployee);
 router.delete('/admin/employees/:id', adminAuth, deleteBranchEmployee);
 router.put('/admin/employees/:id/targets', adminAuth, updateEmployeeTargets);
 router.get('/admin/employee-targets', adminAuth, getEmployeeTargetsPerformance);
+router.post('/admin/employee-targets/sync-old-invoices', adminAuth, syncOldInvoicesToEmployeeTargets);
 
 // سجل الحضور والغياب للأدمن
 router.get('/admin/attendance', adminAuth, getAllAttendanceForAdmin);
@@ -111,9 +139,12 @@ router.post('/admin/attendance', adminAuth, createManualAttendance);
 
 // فواتير وسجلات الفروع للأدمن
 router.get('/admin/invoices', adminAuth, getBranchInvoices);
+router.post('/admin/invoices', adminAuth, createInvoiceForAdmin);
 router.delete('/admin/invoices/:id', adminAuth, deleteInvoice);
 
 router.get('/admin/daily-registers', adminAuth, getAllDailyRegistersForAdmin);
+router.get('/admin/daily-registers/:id', adminAuth, getDailyRegisterById);
+router.post('/admin/daily-registers', adminAuth, createDailyRegisterForAdmin);
 router.put('/admin/daily-registers/:id', adminAuth, updateDailyRegisterForAdmin);
 router.delete('/admin/daily-registers/:id', adminAuth, deleteDailyRegister);
 router.post('/admin/daily-registers/:id/remove-invoice', adminAuth, removeInvoiceFromDailyRegister);

@@ -80,6 +80,11 @@ module.exports = (sequelize, DataTypes) => {
       as: 'attendances',
       onDelete: 'CASCADE',
     });
+    Branch.hasMany(models.BranchFixedExpense, {
+      foreignKey: 'branchId',
+      as: 'fixedExpenses',
+      onDelete: 'CASCADE',
+    });
   };
 
   return Branch;

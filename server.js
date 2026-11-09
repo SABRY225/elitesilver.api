@@ -64,6 +64,11 @@ db.sequelize.authenticate()
         await db.sequelize.query("ALTER TABLE branch_employees ADD COLUMN targetGrams DECIMAL(10, 3) DEFAULT 0");
         console.log('✅ Added targetGrams column to branch_employees');
       }
+      const [colsAllowed] = await db.sequelize.query("SHOW COLUMNS FROM branch_employees LIKE 'allowedBranchIds'");
+      if (!colsAllowed || colsAllowed.length === 0) {
+        await db.sequelize.query("ALTER TABLE branch_employees ADD COLUMN allowedBranchIds TEXT NULL");
+        console.log('✅ Added allowedBranchIds column to branch_employees');
+      }
     } catch (e) {
       // إكمال التشغيل
     }

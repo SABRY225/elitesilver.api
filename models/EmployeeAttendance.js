@@ -1,4 +1,8 @@
 module.exports = (sequelize, DataTypes) => {
+  const decimalType = (DataTypes && typeof DataTypes.DECIMAL === 'function')
+    ? DataTypes.DECIMAL(5, 2)
+    : (DataTypes?.DECIMAL || DataTypes?.FLOAT || 'DECIMAL(5,2)');
+
   const EmployeeAttendance = sequelize.define(
     'EmployeeAttendance',
     {
@@ -32,7 +36,7 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
       },
       totalHours: {
-        type: DataTypes.DECIMAL(5, 2), // عدد الساعات e.g. 8.50
+        type: decimalType, // عدد الساعات e.g. 8.50
         defaultValue: 0,
       },
       status: {

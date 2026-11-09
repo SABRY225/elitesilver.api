@@ -1,4 +1,8 @@
 module.exports = (sequelize, DataTypes) => {
+  const decimalType = (DataTypes && typeof DataTypes.DECIMAL === 'function')
+    ? DataTypes.DECIMAL(10, 3)
+    : (DataTypes?.DECIMAL || DataTypes?.FLOAT || 'DECIMAL(10,3)');
+
   const EmployeeAdvance = sequelize.define(
     'EmployeeAdvance',
     {
@@ -20,7 +24,7 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
       },
       amount: {
-        type: DataTypes.DECIMAL(10, 3),
+        type: decimalType,
         allowNull: false,
       },
       requestDate: {

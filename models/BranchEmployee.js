@@ -1,6 +1,10 @@
 const bcrypt = require('bcryptjs');
 
 module.exports = (sequelize, DataTypes) => {
+  const decimalType = (DataTypes && typeof DataTypes.DECIMAL === 'function')
+    ? DataTypes.DECIMAL(10, 3)
+    : (DataTypes?.DECIMAL || DataTypes?.FLOAT || 'DECIMAL(10,3)');
+
   const BranchEmployee = sequelize.define(
     'BranchEmployee',
     {
@@ -35,23 +39,28 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
       },
       salary: {
-        type: DataTypes.DECIMAL(10, 3),
+        type: decimalType,
         defaultValue: 0,
         allowNull: true,
       },
       targetSales: {
-        type: DataTypes.DECIMAL(10, 3),
+        type: decimalType,
         defaultValue: 0,
         allowNull: true,
       },
       targetGrams: {
-        type: DataTypes.DECIMAL(10, 3),
+        type: decimalType,
         defaultValue: 0,
         allowNull: true,
       },
       nationalId: {
         type: DataTypes.STRING,
         allowNull: true,
+      },
+      allowedBranchIds: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        defaultValue: null,
       },
       isActive: {
         type: DataTypes.BOOLEAN,

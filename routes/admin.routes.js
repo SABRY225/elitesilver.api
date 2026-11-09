@@ -18,9 +18,13 @@ const {
   deleteSpecialOrder
 } = require('../controllers/admin.controller');
 const { getAllOrders, getOrdersSilver } = require('../controllers/order.controller');
+const { getAggregateStatistics, getBranchFixedExpenses } = require('../controllers/branch.controller');
 
 // Dashboard
 router.get('/stats', adminAuth, getDashboardStats);
+router.get('/aggregate-statistics', adminAuth, getAggregateStatistics);
+router.get('/branches/aggregate-statistics', adminAuth, getAggregateStatistics);
+router.get('/fixed-expenses', adminAuth, getBranchFixedExpenses);
 
 // Special Orders (طلبات المناسبات والهدايا)
 router.get('/special-orders', adminAuth, getSpecialOrders);

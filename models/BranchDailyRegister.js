@@ -1,4 +1,8 @@
 module.exports = (sequelize, DataTypes) => {
+  const decimalType = (DataTypes && typeof DataTypes.DECIMAL === 'function')
+    ? DataTypes.DECIMAL(10, 3)
+    : (DataTypes?.DECIMAL || DataTypes?.FLOAT || 'DECIMAL(10,3)');
+
   const BranchDailyRegister = sequelize.define(
     'BranchDailyRegister',
     {
@@ -43,35 +47,35 @@ module.exports = (sequelize, DataTypes) => {
         // ]
       },
       totalGrams: {
-        type: DataTypes.DECIMAL(10, 3),
+        type: decimalType,
         defaultValue: 0, // مجموع الجرامات
       },
       totalSales: {
-        type: DataTypes.DECIMAL(10, 3),
+        type: decimalType,
         defaultValue: 0, // مجموع المبيعات
       },
       totalExpenses: {
-        type: DataTypes.DECIMAL(10, 3),
+        type: decimalType,
         defaultValue: 0, // مجموع المصاريف
       },
       totalVisaSales: {
-        type: DataTypes.DECIMAL(10, 3),
+        type: decimalType,
         defaultValue: 0, // مجموع مبيعات الفيزا
       },
       netTotal: {
-        type: DataTypes.DECIMAL(10, 3),
+        type: decimalType,
         defaultValue: 0, // صافي المجموع ( المبيعات – المصاريف )
       },
       totalAdvances: {
-        type: DataTypes.DECIMAL(10, 3),
+        type: decimalType,
         defaultValue: 0, // مجموع السلف
       },
       brokenSilverGrams: {
-        type: DataTypes.DECIMAL(10, 3),
+        type: decimalType,
         defaultValue: 0, // مجموع جرامات الكسر (الفضه)
       },
       brokenGoldGrams: {
-        type: DataTypes.DECIMAL(10, 3),
+        type: decimalType,
         defaultValue: 0, // مجموع جرامات الكسر (الذهب)
       },
       status: {

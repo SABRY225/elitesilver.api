@@ -1,4 +1,8 @@
 module.exports = (sequelize, DataTypes) => {
+  const decimalType = (DataTypes && typeof DataTypes.DECIMAL === 'function')
+    ? DataTypes.DECIMAL(10, 3)
+    : (DataTypes?.DECIMAL || DataTypes?.FLOAT || 'DECIMAL(10,3)');
+
   const BranchInventoryAudit = sequelize.define(
     'BranchInventoryAudit',
     {
@@ -47,15 +51,15 @@ module.exports = (sequelize, DataTypes) => {
         // ]
       },
       totalSystemWeight: {
-        type: DataTypes.DECIMAL(10, 3),
+        type: decimalType,
         defaultValue: 0,
       },
       totalActualWeight: {
-        type: DataTypes.DECIMAL(10, 3),
+        type: decimalType,
         defaultValue: 0,
       },
       totalWeightDiff: {
-        type: DataTypes.DECIMAL(10, 3),
+        type: decimalType,
         defaultValue: 0,
       },
       totalSystemCount: {

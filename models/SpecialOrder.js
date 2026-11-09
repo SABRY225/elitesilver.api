@@ -1,4 +1,8 @@
 module.exports = (sequelize, DataTypes) => {
+  const decimalType = (DataTypes && typeof DataTypes.DECIMAL === 'function')
+    ? DataTypes.DECIMAL(10, 3)
+    : (DataTypes?.DECIMAL || DataTypes?.FLOAT || 'DECIMAL(10,3)');
+
   const SpecialOrder = sequelize.define('SpecialOrder', {
     id: { 
       type: DataTypes.INTEGER, 
@@ -18,7 +22,7 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true 
     },
     budget: { 
-      type: DataTypes.DECIMAL(10, 3), 
+      type: decimalType, 
       allowNull: true,
       defaultValue: 0 
     },

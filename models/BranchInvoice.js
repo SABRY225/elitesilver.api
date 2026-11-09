@@ -1,4 +1,8 @@
 module.exports = (sequelize, DataTypes) => {
+  const decimalType = (DataTypes && typeof DataTypes.DECIMAL === 'function')
+    ? DataTypes.DECIMAL(10, 3)
+    : (DataTypes?.DECIMAL || DataTypes?.FLOAT || 'DECIMAL(10,3)');
+
   const BranchInvoice = sequelize.define(
     'BranchInvoice',
     {
@@ -57,15 +61,15 @@ module.exports = (sequelize, DataTypes) => {
         // ]
       },
       subtotal: {
-        type: DataTypes.DECIMAL(10, 3),
+        type: decimalType,
         defaultValue: 0, // المجموع
       },
       discount: {
-        type: DataTypes.DECIMAL(10, 3),
+        type: decimalType,
         defaultValue: 0, // خصم
       },
       total: {
-        type: DataTypes.DECIMAL(10, 3),
+        type: decimalType,
         defaultValue: 0, // الإجمالي
       },
       recipientName: {

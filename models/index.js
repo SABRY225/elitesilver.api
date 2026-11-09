@@ -35,6 +35,7 @@ db.BranchInventoryAudit = require('./BranchInventoryAudit')(sequelize, DataTypes
 db.EmployeeAdvance = require('./EmployeeAdvance')(sequelize, DataTypes);
 db.EmployeeAttendance = require('./EmployeeAttendance')(sequelize, DataTypes);
 db.SpecialOrder = require('./SpecialOrder')(sequelize, DataTypes);
+db.BranchFixedExpense = require('./BranchFixedExpense')(sequelize, DataTypes);
 
 
 // تفعيل العلاقات
